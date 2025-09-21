@@ -1,0 +1,6 @@
+{
+    "intelephense.environment.includePaths": [
+    "vendor/laravel/framework/src"
+],
+"intelephense.diagnostics.undefinedMethods": false
+}
