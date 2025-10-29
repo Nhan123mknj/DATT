@@ -2,13 +2,17 @@
 
 namespace App\Services;
 
+use App\Filters\UserFilter;
 use App\Models\User;
 
 class UserService
 {
-    public function getAllUser()
+    public function getAllUser($filters = [], $perPage = 10)
     {
-        return User::all();
+        $query = User::query()->orderBy('id', 'ASC');
+        $query = (new UserFilter($query, $filters))->apply();
+
+        return $query->paginate($perPage);
     }
     public function getUserById($id)
     {

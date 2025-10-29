@@ -2,39 +2,20 @@
 
 namespace App\Services;
 
+use App\Filters\DeviceCategoryFilter;
 use App\Models\Devices;
 use App\Models\CategoriesDevice;
 use App\Models\DeviceUnits;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DeviceCategoryService
 {
     public function listCategories($filters = [], $perPage = 15)
     {
-        $query = CategoriesDevice::with('devices');
+        $query = CategoriesDevice::with('devices')->orderBy('id', 'ASC');
 
-        if (isset($filters['is_active'])) {
-            $query->where('is_active', $filters['is_active']);
-        }
-
-        if (isset($filters['search'])) {
-            $search = $filters['search'];
-            $query->where('name', 'like', "%$search%");
-        }
-
-        $allowSortFields = [
-            'name' => 'name',
-            'created_at' => 'created_at',
-        ];
-        if (isset($filters['order_by']) && array_key_exists($filters['order_by'], $allowSortFields)) {
-            $orderBy = $allowSortFields[$filters['order_by']];
-            $direction = $filters['direction'] ?? 'asc';
-            $query->orderBy($orderBy, $direction);
-        }
-
-        if (isset($filters['with_devices']) && $filters['with_devices']) {
-            $query->whereHas('devices');
-        }
+        $query = (new DeviceCategoryFilter($query, $filters))->apply();
 
         return $query->paginate($perPage);
     }

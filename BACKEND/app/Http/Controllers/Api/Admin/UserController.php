@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreUserRequest;
 use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Http\Request;
@@ -19,9 +20,13 @@ class UserController extends Controller
         $this->userService = $userService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $users = $this->userService->getAllUser();
+        $filters = $request->only(['name', 'email', 'role', 'is_active', 'from_date', 'to_date']);
+
+        $perPage = $request->get('per_page', 10);
+
+        $users = $this->userService->getAllUser($filters, $perPage);
 
         if ($users->isEmpty()) {
             return response()->json(['message' => 'No users found'], 404);
@@ -34,24 +39,18 @@ class UserController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreUserRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6',
-            'role' => 'required|in:admin,borrower,staff',
-        ]);
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
         $user = $this->userService->createUser([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => bcrypt($request->password),
+            'password' => bcrypt($request->name . "123"),
             'role' => $request->role,
         ]);
-        return response()->json(['message' => 'User created successfully', 'user' => $user], 201);
+        return response()->json([
+            'message' => 'User created successfully',
+            'user'    => $user
+        ], 201);
     }
 
     /**
@@ -63,8 +62,9 @@ class UserController extends Controller
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
         }
-
-        return response()->json($user, 200);
+        return response()->json([
+            'data' => $user
+        ]);
     }
 
     /**
@@ -91,7 +91,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'User updated successfully',
-            'user' => $user
+            'data' => $user
         ], 200);
     }
 

@@ -18,7 +18,6 @@ class DeviceUnits extends Model
         'purchase_date',
         'warranty_end',
         'notes',
-        'deleted_at',
     ];
     protected $dates = ['purchase_date', 'warranty_end'];
 
@@ -37,8 +36,12 @@ class DeviceUnits extends Model
     {
         return $query->where('is_active', true);
     }
-    public function isAvailable()
+    public function isAvailable(): bool
     {
         return $this->status === 'available';
+    }
+    public function borrowDetail()
+    {
+        return $this->hasMany(BorrowsDetail::class, 'device_unit_id');
     }
 }

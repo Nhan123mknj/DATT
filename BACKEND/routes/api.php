@@ -4,9 +4,11 @@ use App\Http\Controllers\Api\Admin\DeviceCategoriesController;
 use App\Http\Controllers\Api\Admin\DeviceController;
 use App\Http\Controllers\Api\Admin\DeviceUnitsController;
 use App\Http\Controllers\Api\Admin\UserController;
+use App\Http\Controllers\Api\Borrower\BorrowController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\Admin\MenuController;
 
 
 Route::prefix('admin')->middleware(['auth:api', 'role:admin'])->group(function () {
@@ -38,6 +40,16 @@ Route::prefix('admin')->middleware(['auth:api', 'role:admin'])->group(function (
     // Route::get('device/{id}/edit', [DeviceController::class, 'edit']);
 
     Route::apiResource('device-units', DeviceUnitsController::class);
+    Route::get('menus/', [MenuController::class, 'showByKey']);
+});
+
+// Allow any authenticated user to fetch menu filtered by their own role
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('menus/', [MenuController::class, 'showByKey']);
+});
+
+Route::middleware(['auth:api', 'role:borrower,admin'])->group(function () {
+    Route::apiResource('borrower', BorrowController::class);
 });
 
 Route::prefix('auth')->group(function () {
@@ -49,5 +61,6 @@ Route::prefix('auth')->group(function () {
         Route::post('/refresh', [AuthController::class, 'refresh']);
         Route::get('/user-profile', [AuthController::class, 'userProfile']);
         Route::post('/change-pass', [AuthController::class, 'changePassWord']);
+        Route::get('/verify-access', [AuthController::class, 'verifyAccess']);
     });
 });

@@ -28,7 +28,9 @@ class DeviceCategoriesController extends Controller
         if ($categories->isEmpty()) {
             return response()->json(['message' => 'No categories found'], 404);
         }
-        return response()->json($categories, 200);
+        return response()->json([
+            'categories' => $categories,
+        ], 200);
     }
 
     /**

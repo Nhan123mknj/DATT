@@ -33,7 +33,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
         'updated_at',
         'avatar',
     ];
-
+    protected $appends = ['avatar_url'];
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -71,13 +71,17 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
      *
      * @return array
      */
-        public function getJWTCustomClaims()
-        {
-            return [
-                'id' => $this->id,
-                'role' => $this->role,
-                'name' => $this->name,
-                'is_active' => $this->is_active,
-            ];
-        }
+    public function getJWTCustomClaims()
+    {
+        return [
+            'id' => $this->id,
+            'role' => $this->role,
+            'name' => $this->name,
+            'is_active' => $this->is_active,
+        ];
+    }
+    public function getAvatarUrlAttribute()
+    {
+        return $this->avatar ?? asset('images/default-avatar.png');
+    }
 }

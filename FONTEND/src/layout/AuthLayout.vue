@@ -13,12 +13,25 @@
         </p>
 
         <!-- Form -->
-        <form @submit.prevent class="flex flex-col w-full space-y-4 relative">
+        <form
+          @submit.prevent="handleLogin"
+          class="flex flex-col w-full space-y-4 relative"
+        >
+          <!-- Error Message -->
+          <div
+            v-if="errorMessage"
+            class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"
+          >
+            {{ errorMessage }}
+          </div>
+
           <!-- Username -->
           <input
-            type="text"
+            v-model="email"
+            type="email"
             placeholder="Email"
             class="w-full px-4 py-3 rounded-lg bg-gray-100 border border-gray-300 placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            :disabled="isLoading"
           />
 
           <!-- Password -->
@@ -28,12 +41,14 @@
               :type="passwordVisible ? 'text' : 'password'"
               placeholder="Mật khẩu"
               class="w-full px-4 py-3 rounded-lg bg-gray-100 border border-gray-300 placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 pr-10"
+              :disabled="isLoading"
             />
             <!-- Eye icon -->
             <button
               type="button"
               @click="togglePasswordVisibility"
               class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+              :disabled="isLoading"
             >
               <font-awesome-icon
                 :icon="passwordVisible ? 'eye-slash' : 'eye'"
@@ -44,9 +59,11 @@
           <!-- Button -->
           <button
             type="submit"
-            class="w-full bg-indigo-500 text-white py-3 rounded-lg font-medium hover:bg-indigo-600 transition-colors"
+            :disabled="isLoading"
+            class="w-full bg-indigo-500 text-white py-3 rounded-lg font-medium hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Đăng nhập
+            <span v-if="isLoading">Đang đăng nhập...</span>
+            <span v-else>Đăng nhập</span>
           </button>
         </form>
       </div>
@@ -65,15 +82,43 @@
 </template>
 <script setup>
 import { ref } from "vue";
+import { useRouter } from "vue-router";
+import authService from "../services/authService.js";
+
+const router = useRouter();
 
 const passwordVisible = ref(false);
+const email = ref("");
+const password = ref("");
+const isLoading = ref(false);
+const errorMessage = ref("");
+
 const togglePasswordVisibility = () => {
   passwordVisible.value = !passwordVisible.value;
 };
-const email = ref("");
-const password = ref("");
 
-let handleLogin = () => {
-  ax
+const handleLogin = async () => {
+  if (!email.value || !password.value) {
+    errorMessage.value = "Vui lòng nhập đầy đủ thông tin";
+    return;
+  }
+
+  isLoading.value = true;
+  errorMessage.value = "";
+
+  try {
+    const result = await authService.login(email.value, password.value);
+
+    if (result.success) {
+      if (result.success) router.push({ name: `${result.role}.dashboard` });
+    } else {
+      errorMessage.value = result.error || "Đăng nhập thất bại";
+    }
+  } catch (error) {
+    errorMessage.value = "Có lỗi xảy ra, vui lòng thử lại";
+    console.error("Login error:", error);
+  } finally {
+    isLoading.value = false;
+  }
 };
 </script>
