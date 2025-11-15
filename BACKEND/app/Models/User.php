@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Models\ApprovalQueue;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -83,5 +84,13 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
     public function getAvatarUrlAttribute()
     {
         return $this->avatar ?? asset('images/default-avatar.png');
+    }
+    public function borrows()
+    {
+        return $this->hasMany(Borrows::class, 'borrower_id');
+    }
+    public function approvalRequests()
+    {
+        return $this->hasMany(ApprovalQueue::class, 'requester_by');
     }
 }

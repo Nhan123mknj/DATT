@@ -21,6 +21,8 @@ return new class extends Migration
             $table->timestamp('returned_at')->nullable();
             $table->enum('status', ['borrowed', 'returned'])->default('borrowed');
             $table->timestamps();
+   
+            $table->string('proof_image_return')->nullable()->comment('Ảnh chụp thiết bị khi trả');
         });
     }
 

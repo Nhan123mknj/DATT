@@ -60,6 +60,13 @@ class BorrowPolicy
         if ($cancelCount >= 3) {
             return false;
         }
+        $activeCount = Borrows::where('borrower_id', $user->id)
+            ->whereIn('status', ['pending', 'approved', 'borrowed'])
+            ->count();
+
+        if ($activeCount >= 3) {
+            return false;
+        }
         return true;
     }
 

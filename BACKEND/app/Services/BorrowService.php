@@ -7,32 +7,25 @@ use App\Models\BorrowsDetail;
 use App\Models\DeviceUnits;
 use App\Models\User;
 use App\Notifications\BorrowNotification;
+use App\Services\Borrow\BorrowStrategyFactory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
-class BorrowService
+class BorrowService extends BaseService
 {
     public function showBorrowingSlip($filters = [], $perPage = 15,)
     {
-        // Gate::authorize('viewAny', Borrows::class);
         $query = Borrows::with([
-            'details:id,borrow_id,device_unit_id',
-            'details.deviceUnit:id,device_id,serial_number',
-            'details.deviceUnit.device:id,name'
+            'details.deviceUnit.device',
         ]);
 
         if (auth()->user()->role === "borrower") {
             $query->where('borrower_id', auth()->id());
         }
 
-        $arrayStatus = ['borrowed', 'returned', 'overdue', 'canceled'];
         if (isset($filters['status'])) {
-            $statuses = is_array($filters['status']) ? $filters['status'] : [$filters['status']];
-            $validStatuses = array_intersect($statuses, $arrayStatus);
-            if (!empty($validStatuses)) {
-                $query->whereIn('status', $validStatuses);
-            }
+            $query->whereIn('status', (array)$filters['status']);
         }
         // Gate::authorize('view', $query);
         return $query->paginate($perPage);
@@ -41,25 +34,72 @@ class BorrowService
     public function createBorrowingSlip(array $data)
     {
         return $this->runInTransactionWithRetry(function () use ($data) {
+            $userId = auth('api')->user()->id;
+            $expectedReturn = $data['expected_return_date'];
+            $devices = collect($data['devices']);
 
-            $this->checkDevicesAvailable($data['devices']);
-            $this->checkUserCancelLimit(auth('api')->user()->id);
-            $this->checkUserBorrowLimit(auth('api')->user()->id);
+            $this->checkUserBorrowLimit($userId);
 
-            $borrow = Borrows::create([
-                'borrower_id' => auth('api')->user()->id,
-                'expected_return_date' => $data['expected_return_date'],
-                'status' => 'pending',
-                'notes' => $data['notes'] ?? null,
-            ]);
-            foreach ($data['devices'] as $device) {
-                BorrowsDetail::create([
-                    'borrow_id' => $borrow->id,
-                    'device_unit_id' => $device['device_unit_id'],
-                    'status' => 'pending',
-                    'condition_at_borrow' => $device['condition_at_borrow'] ?? 'tốt',
+            $deviceUnits = DeviceUnits::with('device')->whereIn('id', $devices->pluck('device_unit_id'))->get()->keyBy('id');
+
+            $hasExpensive = $deviceUnits->contains(function ($unit) {
+                return $unit->device && $unit->device->category_id == 2;
+            });
+            if ($hasExpensive && empty($data['commitment_file'])) {
+                throw ValidationException::withMessages([
+                    'commitment_file' => 'Thiết bị đắt tiền yêu cầu nộp file cam kết trách nhiệm.'
                 ]);
             }
+
+            $borrow = Borrows::create([
+                'borrower_id' => $userId,
+                'expected_return_date' => $expectedReturn,
+                'status' => 'pending',
+                'notes' => $data['notes'] ?? null,
+                // 'borrowed_date' => today(),
+                'commitment_file' => $data['commitment_file'] ?? null,
+            ]);
+
+            $devices->each(function ($deviceData) use ($borrow, $deviceUnits, $expectedReturn, $userId) {
+                $deviceUnitId = $deviceData['device_unit_id'];
+                $deviceUnit = $deviceUnits[$deviceUnitId] ?? null;
+
+                if (!$deviceUnit || !$deviceUnit->device) {
+                    throw ValidationException::withMessages([
+                        'devices' => "Thiết bị ID {$deviceUnitId} không tồn tại."
+                    ]);
+                }
+
+                $duration = $expectedReturn
+                    ? now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($expectedReturn)->startOfDay()) + 1
+                    : 1;
+
+                $strategy = BorrowStrategyFactory::createStrategy($deviceUnit->device);
+
+                $strategy->validateBorrow([
+                    'device_id' => $deviceUnit->device_id,
+                    'device_unit_id' => $deviceUnitId,
+                    'quantity' => 1,
+                    'duration' => $duration,
+                    'user_id' => $userId,
+                ]);
+
+                $result = $strategy->processBorrow([
+                    'device_id' => $deviceUnit->device_id,
+                    'device_unit_id' => $deviceUnitId,
+                    'quantity' => 1,
+                    'duration' => $duration,
+                    'user_id' => $userId,
+                ]);
+
+                BorrowsDetail::create([
+                    'borrow_id' => $borrow->id,
+                    'device_unit_id' => $deviceUnitId,
+                    'status' => $result['status'] ?? 'pending',
+                    'condition_at_borrow' => $deviceData['condition_at_borrow'] ?? 'tốt',
+                    'deposit_amount' => $result['deposit_amount'] ?? 0,
+                ]);
+            });
 
             DB::afterCommit(function () use ($borrow) {
                 $staffUsers = User::where('role', 'staff')->get();
@@ -86,44 +126,6 @@ class BorrowService
         return response()->json($result, 200);
     }
 
-    private function checkDevicesAvailable(array $devices)
-    {
-        foreach ($devices as $device) {
-            $deviceUnit = DeviceUnits::lockForUpdate()->findOrFail($device['device_unit_id']);
-            if ($deviceUnit->status !== 'available') {
-                throw ValidationException::withMessages([
-                    "Thiết bị #{$deviceUnit->id} không khả dụng."
-                ]);
-            }
-        }
-    }
-
-    private function checkUserCancelLimit($id)
-    {
-        $cancelCount = Borrows::where('borrower_id', $id)
-            ->where('status', 'canceled')
-            ->whereDate('updated_at', today())
-            ->count();
-
-        if ($cancelCount >= 3) {
-            throw ValidationException::withMessages([
-                "Tai khoan cua ban da huy qua nhieu."
-            ]);
-        }
-    }
-
-    private function checkUserBorrowLimit($id)
-    {
-        $borrowCount = Borrows::where('borrower_id', $id)
-            ->where('status', 'borrowed')
-            ->whereDate('updated_at', today())
-            ->count();
-        if ($borrowCount >= 3) {
-            throw ValidationException::withMessages([
-                "Tai khoan cua ban da muon qua nhieu."
-            ]);
-        }
-    }
 
     public function approveBorrowRequest(int $borrowId)
     {
@@ -132,17 +134,15 @@ class BorrowService
 
             Gate::authorize('approve', $borrow);
 
-            if (!in_array($borrow->status, ['pending', 'approved'], true)) {
-                throw ValidationException::withMessages(['Phieu khong o trang thai co the duyet.']);
+            if ($borrow->status !== 'pending') {
+                throw ValidationException::withMessages(['Phiếu không ở trạng thái chờ duyệt.']);
             }
 
-            if ($borrow->status !== 'approved') {
-                $borrow->status = 'approved';
-                $borrow->save();
-            }
+            $borrow->status = 'approved';
+            $borrow->save();
 
             DB::afterCommit(function () use ($borrow) {
-                // notify approver/borrower if needed
+                // $borrow->borrower->notify(new BorrowNotification("Phiếu mượn của bạn đã được duyệt."));
             });
 
             return $borrow->load('details');
@@ -248,27 +248,5 @@ class BorrowService
 
             return $borrow->load('details.deviceUnit');
         });
-    }
-
-    private function runInTransactionWithRetry(callable $callback, int $maxAttempts = 3)
-    {
-        $attempt = 0;
-        beginning:
-        $attempt++;
-        try {
-            return DB::transaction(function () use ($callback) {
-                return $callback();
-            });
-        } catch (\Throwable $e) {
-            $message = $e->getMessage();
-            $isDeadlock = str_contains($message, 'Deadlock found')
-                || str_contains($message, 'SQLSTATE[40001]')
-                || str_contains($message, 'SQLSTATE[1213]');
-            if ($isDeadlock && $attempt < $maxAttempts) {
-                usleep(100000 * $attempt);
-                goto beginning;
-            }
-            throw $e;
-        }
     }
 }

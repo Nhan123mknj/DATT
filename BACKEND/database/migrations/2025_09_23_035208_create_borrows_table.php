@@ -20,6 +20,8 @@ return new class extends Migration
             $table->date('actual_return_date')->nullable();
             $table->enum('status', ['borrowed', 'returned', 'overdue', 'canceled'])->default('borrowed');
             $table->text('notes')->nullable();
+
+            
         });
     }
 

@@ -20,6 +20,10 @@ class Devices extends Model
         'total_units',
         'deleted_at',
         'model',
+        'code',
+        'description',
+        'price',
+        'quantity',
     ];
 
     public function category()
@@ -27,12 +31,30 @@ class Devices extends Model
         return $this->belongsTo(CategoriesDevice::class, 'category_id');
     }
 
+    public function getDeviceTypeAttribute()
+    {
+        return $this->category->type;
+    }
+
+    public function getDepositRateAttribute()
+    {
+        return $this->category->deposit_rate;
+    }
+
+    public function getMaxBorrowDurationAttribute()
+    {
+        return $this->category->max_borrow_duration;
+    }
+
+    public function requiresApproval()
+    {
+        return $this->category->requires_approval;
+    }
 
     public function units()
     {
         return $this->hasMany(DeviceUnits::class, 'device_id');
     }
-
 
     public function scopeActive($query)
     {

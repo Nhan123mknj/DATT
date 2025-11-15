@@ -15,12 +15,12 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            CategoriesDeviceSeeder::class,
+            DeviceCategorySeeder::class,
             DevicesSeeder::class,
             DeviceUnitsSeeder::class,
+            MenuSeeder::class,
         ]);
 
-        // Seed ngẫu nhiên thêm dữ liệu test
         
         
         

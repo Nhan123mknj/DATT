@@ -7,6 +7,7 @@ use App\Http\Requests\BorrowRequest;
 use App\Models\Borrows;
 use App\Services\BorrowService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class BorrowController extends Controller
 {
@@ -37,7 +38,7 @@ class BorrowController extends Controller
      */
     public function store(BorrowRequest $request)
     {
-
+        Gate::authorize('create', Borrows::class);
         $borrow = $this->borrowService->createBorrowingSlip($request->all());
 
         return response()->json([
