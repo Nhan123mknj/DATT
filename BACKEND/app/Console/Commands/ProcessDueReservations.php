@@ -5,43 +5,54 @@ namespace App\Console\Commands;
 use App\Jobs\AutoCreateBorrowJob;
 use App\Models\DeviceReservation;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class ProcessDueReservations extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'app:process-due-reservations';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Command description';
+    protected $description = 'Fallback: Tạo phiếu mượn từ đặt trước đã miss';
 
-    /**
-     * Execute the console command.
-     */
     public function handle()
     {
-        info('Processing due reservations at ' . now());
+        $this->info('🔄 Xử lý các đặt trước đã đến hạn lúc ' . now());
 
-        $dueReservations = DeviceReservation::where('status', 'pending')
+        $missedReservations = DeviceReservation::where('status', 'approved')
             ->where('reserved_from', '<=', now())
             ->where('status', '!=', 'completed')
             ->get();
-        if ($dueReservations->isEmpty()) {
-            info('No due reservations found.');
+
+        if ($missedReservations->isEmpty()) {
+            $this->info('✅ Không có đặt trước bị miss.');
             return Command::SUCCESS;
         }
-        foreach ($dueReservations as $reservation) {
-            AutoCreateBorrowJob::dispatch($reservation)
-                ->onQueue('reservations');
-            info("Dispatched AutoCreateBorrowJob for reservation ID: {$reservation->id}");
+
+        $count = 0;
+        foreach ($missedReservations as $reservation) {
+            try {
+                // Chỉ dispatch nếu chưa tạo phiếu mượn
+                if (!$this->borrowExists($reservation->id)) {
+                    AutoCreateBorrowJob::dispatch($reservation)
+                        ->onQueue('reservations');
+
+                    Log::info("🔄 Fallback: Dispatch AutoCreateBorrowJob cho reservation #{$reservation->id}");
+                    $this->line("✅ Xử lý lại đặt trước #{$reservation->id}");
+                    $count++;
+                }
+            } catch (\Exception $e) {
+                Log::error("❌ Lỗi xử lý reservation #{$reservation->id}: " . $e->getMessage());
+                $this->error("❌ Lỗi: " . $e->getMessage());
+            }
         }
+
+        $this->info("✅ Xử lý xong {$count} đặt trước bị miss.");
         return Command::SUCCESS;
+    }
+
+    private function borrowExists(int $reservationId): bool
+    {
+        return \App\Models\Borrows::whereHas('details', function ($query) use ($reservationId) {
+            $query->where('notes', 'like', "%đặt trước #{$reservationId}%");
+        })->exists();
     }
 }

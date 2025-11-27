@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UploadAvatarRequest;
 use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Http\Request;
@@ -131,6 +132,31 @@ class UserController extends Controller
         return response()->json([
             'message' => $result['message'],
             'user'    => $result['user']
+        ], 200);
+    }
+
+    /**
+     * Upload avatar for user
+     */
+    public function uploadAvatar(UploadAvatarRequest $request, string $id)
+    {
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        $result = $this->userService->uploadAvatar($id, $request->file('avatar'));
+
+        if (!$result || !$result['success']) {
+            return response()->json([
+                'message' => $result['message'] ?? 'Upload avatar thất bại'
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => $result['message'],
+            'avatar_url' => $result['avatar_url'],
+            'user' => $user->fresh(['media']),
         ], 200);
     }
 }

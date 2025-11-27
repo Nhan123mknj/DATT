@@ -154,6 +154,7 @@ export default {
   data() {
     return {
       form: {
+        id: "",
         name: "",
         email: "",
         role: "",
@@ -168,6 +169,7 @@ export default {
       handler(newUserData) {
         if (newUserData) {
           this.form = {
+            id: newUserData.id,
             name: newUserData.name || "",
             email: newUserData.email || "",
             role: newUserData.role || "",

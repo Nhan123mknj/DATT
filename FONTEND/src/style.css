@@ -1,23 +1,25 @@
 @import "tailwindcss";
 
+/* Flowbite integration - included via tailwind.config.js plugin */
+
 /* Apply Outfit font */
 :root {
   font-family: 'Outfit', sans-serif;
 }
 
-@theme{
-    --color-primary: #2c84c2;
-    --color-menu-item: #304356;
-    --color-menu-item-hover: #4e5f6d;
-    --color-menu-item-focus: #0f66c5;
-    --color-secondary: #6c757d;
-    --color-success: #28a745;
-    --color-info: #17a2b8;
-    --color-warning: #ffc107;
-    --color-danger: #dc3545;
-    --color-light: #f8f9fa;
-    --color-dark: #343a40;
-    --color-white: #fff;
-    --color-black: #000;
-
+/* Custom theme colors */
+:root {
+  --color-primary: #2c84c2;
+  --color-menu-item: #304356;
+  --color-menu-item-hover: #4e5f6d;
+  --color-menu-item-focus: #0f66c5;
+  --color-secondary: #6c757d;
+  --color-success: #28a745;
+  --color-info: #17a2b8;
+  --color-warning: #ffc107;
+  --color-danger: #dc3545;
+  --color-light: #f8f9fa;
+  --color-dark: #343a40;
+  --color-white: #fff;
+  --color-black: #000;
 }

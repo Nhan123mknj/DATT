@@ -22,7 +22,7 @@ class DeviceCategoriesController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only(['is_active', 'search', 'with_devices']);
-        $perPage = $request->get('page', 15);
+        $perPage = $request->get('per_page', 15);
 
         $categories = $this->deviceCategoryService->listCategories($filters, $perPage);
         if ($categories->isEmpty()) {

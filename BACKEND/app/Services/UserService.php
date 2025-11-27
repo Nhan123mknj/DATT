@@ -77,4 +77,32 @@ class UserService
             'user'    => $user
         ];
     }
+
+
+    public function uploadAvatar($userId, $file)
+    {
+        $user = User::find($userId);
+        if (!$user) {
+            return null;
+        }
+
+        $media = $user->uploadMedia($file, 'avatar');
+
+        if (!$media) {
+            return [
+                'success' => false,
+                'message' => 'Upload avatar thất bại',
+            ];
+        }
+
+        $user->avatar = $media->secure_url;
+        $user->save();
+
+        return [
+            'success' => true,
+            'message' => 'Upload avatar thành công',
+            'avatar_url' => $media->secure_url,
+            'media' => $media,
+        ];
+    }
 }

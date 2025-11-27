@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\DeviceReservation;
 use App\Services\ReservationService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -17,9 +18,11 @@ class AutoCreateBorrowJob implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(int $reservationId)
+    public function __construct(DeviceReservation $reservation)
     {
-        $this->reservationId = $reservationId;
+        $this->reservationId = $reservation instanceof DeviceReservation
+            ? $reservation->id
+            : $reservation;
     }
 
     /**
@@ -31,6 +34,7 @@ class AutoCreateBorrowJob implements ShouldQueue
             $reservationService->autoCreateBorrowFromReservation($this->reservationId);
         } catch (\Exception $e) {
             \Log::error("Failed to auto create borrow from reservation ID {$this->reservationId}: " . $e->getMessage());
+            throw $e;
         }
     }
     public $tries = 3;

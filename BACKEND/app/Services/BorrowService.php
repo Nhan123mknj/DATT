@@ -6,6 +6,7 @@ use App\Models\Borrows;
 use App\Models\BorrowsDetail;
 use App\Models\DeviceUnits;
 use App\Models\User;
+use App\Services\BaseSevice;
 use App\Notifications\BorrowNotification;
 use App\Services\Borrow\BorrowStrategyFactory;
 use Illuminate\Support\Facades\DB;
@@ -34,82 +35,107 @@ class BorrowService extends BaseService
     public function createBorrowingSlip(array $data)
     {
         return $this->runInTransactionWithRetry(function () use ($data) {
-            $userId = auth('api')->user()->id;
-            $expectedReturn = $data['expected_return_date'];
-            $devices = collect($data['devices']);
+            try {
+                // Lấy user_id từ data (cho staff), hoặc từ auth (cho borrower)
+                $userId = $data['borrower_id'] ?? auth('api')->user()->id;
+                $expectedReturn = $data['expected_return_date'];
+                $devices = collect($data['devices']);
 
-            $this->checkUserBorrowLimit($userId);
-
-            $deviceUnits = DeviceUnits::with('device')->whereIn('id', $devices->pluck('device_unit_id'))->get()->keyBy('id');
-
-            $hasExpensive = $deviceUnits->contains(function ($unit) {
-                return $unit->device && $unit->device->category_id == 2;
-            });
-            if ($hasExpensive && empty($data['commitment_file'])) {
-                throw ValidationException::withMessages([
-                    'commitment_file' => 'Thiết bị đắt tiền yêu cầu nộp file cam kết trách nhiệm.'
-                ]);
-            }
-
-            $borrow = Borrows::create([
-                'borrower_id' => $userId,
-                'expected_return_date' => $expectedReturn,
-                'status' => 'pending',
-                'notes' => $data['notes'] ?? null,
-                // 'borrowed_date' => today(),
-                'commitment_file' => $data['commitment_file'] ?? null,
-            ]);
-
-            $devices->each(function ($deviceData) use ($borrow, $deviceUnits, $expectedReturn, $userId) {
-                $deviceUnitId = $deviceData['device_unit_id'];
-                $deviceUnit = $deviceUnits[$deviceUnitId] ?? null;
-
-                if (!$deviceUnit || !$deviceUnit->device) {
+                if ($devices->isEmpty()) {
                     throw ValidationException::withMessages([
-                        'devices' => "Thiết bị ID {$deviceUnitId} không tồn tại."
+                        'devices' => 'Phải chọn ít nhất một thiết bị.'
                     ]);
                 }
 
-                $duration = $expectedReturn
-                    ? now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($expectedReturn)->startOfDay()) + 1
-                    : 1;
+                // Validate devices trước
+                $deviceUnitIds = $devices->pluck('device_unit_id')->toArray();
+                $deviceUnits = DeviceUnits::with('device')->whereIn('id', $deviceUnitIds)->get()->keyBy('id');
 
-                $strategy = BorrowStrategyFactory::createStrategy($deviceUnit->device);
-
-                $strategy->validateBorrow([
-                    'device_id' => $deviceUnit->device_id,
-                    'device_unit_id' => $deviceUnitId,
-                    'quantity' => 1,
-                    'duration' => $duration,
-                    'user_id' => $userId,
-                ]);
-
-                $result = $strategy->processBorrow([
-                    'device_id' => $deviceUnit->device_id,
-                    'device_unit_id' => $deviceUnitId,
-                    'quantity' => 1,
-                    'duration' => $duration,
-                    'user_id' => $userId,
-                ]);
-
-                BorrowsDetail::create([
-                    'borrow_id' => $borrow->id,
-                    'device_unit_id' => $deviceUnitId,
-                    'status' => $result['status'] ?? 'pending',
-                    'condition_at_borrow' => $deviceData['condition_at_borrow'] ?? 'tốt',
-                    'deposit_amount' => $result['deposit_amount'] ?? 0,
-                ]);
-            });
-
-            DB::afterCommit(function () use ($borrow) {
-                $staffUsers = User::where('role', 'staff')->get();
-                $message = auth('api')->user()->name . " đã gửi phiếu mượn";
-                foreach ($staffUsers as $staff) {
-                    $staff->notify(new BorrowNotification($message, $borrow->id));
+                foreach ($deviceUnitIds as $unitId) {
+                    if (!isset($deviceUnits[$unitId])) {
+                        throw ValidationException::withMessages([
+                            'devices' => "Thiết bị ID {$unitId} không tồn tại."
+                        ]);
+                    }
+                    $unit = $deviceUnits[$unitId];
+                    if (!$unit->device) {
+                        throw ValidationException::withMessages([
+                            'devices' => "Thiết bị ID {$unitId} không có thông tin device."
+                        ]);
+                    }
                 }
-            });
 
-            return $borrow->load('details');
+                // $this->checkUserBorrowLimit($userId);
+
+                $hasExpensive = $deviceUnits->contains(function ($unit) {
+                    return $unit->device && $unit->device->category_id == 2;
+                });
+                if ($hasExpensive && empty($data['commitment_file'])) {
+                    throw ValidationException::withMessages([
+                        'commitment_file' => 'Thiết bị đắt tiền yêu cầu nộp file cam kết trách nhiệm.'
+                    ]);
+                }
+
+                $borrow = Borrows::create([
+                    'borrower_id' => $userId,
+                    'expected_return_date' => $expectedReturn,
+                    'status' => 'pending',
+                    'notes' => $data['notes'] ?? null,
+                    // 'borrowed_date' => today(),
+                    'commitment_file' => $data['commitment_file'] ?? null,
+                ]);
+
+                $devices->each(function ($deviceData) use ($borrow, $deviceUnits, $expectedReturn, $userId) {
+                    $deviceUnitId = $deviceData['device_unit_id'];
+                    $deviceUnit = $deviceUnits[$deviceUnitId];
+
+                    $duration = $expectedReturn
+                        ? now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($expectedReturn)->startOfDay()) + 1
+                        : 1;
+
+                    $strategy = BorrowStrategyFactory::createStrategy($deviceUnit->device);
+
+                    $strategy->validateBorrow([
+                        'device_id' => $deviceUnit->device_id,
+                        'device_unit_id' => $deviceUnitId,
+                        'quantity' => 1,
+                        'duration' => $duration,
+                        'user_id' => $userId,
+                    ]);
+
+                    $result = $strategy->processBorrow([
+                        'device_id' => $deviceUnit->device_id,
+                        'device_unit_id' => $deviceUnitId,
+                        'quantity' => 1,
+                        'duration' => $duration,
+                        'user_id' => $userId,
+                    ]);
+
+                    BorrowsDetail::create([
+                        'borrow_id' => $borrow->id,
+                        'device_unit_id' => $deviceUnitId,
+                        'status' => $result['status'] ?? 'pending',
+                        'condition_at_borrow' => $deviceData['condition_at_borrow'] ?? 'tốt',
+                        'deposit_amount' => $result['deposit_amount'] ?? 0,
+                    ]);
+                });
+
+                DB::afterCommit(function () use ($borrow) {
+                    $staffUsers = User::where('role', 'staff')->get();
+                    $message = "Phiếu mượn được tạo";
+                    foreach ($staffUsers as $staff) {
+                        $staff->notify(new BorrowNotification($message, $borrow->id));
+                    }
+                });
+
+                return $borrow->load('details');
+            } catch (\Exception $e) {
+                \Log::error('createBorrowingSlip error: ' . $e->getMessage(), [
+                    'data' => $data,
+                    'trace' => $e->getTraceAsString()
+                ]);
+                throw $e;
+            }
         });
     }
 

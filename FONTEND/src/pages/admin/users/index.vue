@@ -75,9 +75,8 @@
   <!-- Form thêm -->
   <AddUserForm
     :visible="showAddModal"
-    :is-submitting="isSubmitting"
-    :server-errors="serverErrors"
     @close="closeModals"
+    @refresh="loadUsers"
   />
 
   <!-- Form sửa -->
@@ -93,7 +92,7 @@
 </template>
 
 <script>
-import { usersService } from "../../../services/usersService";
+import { usersService } from "../../../services/users/usersService";
 import { useToast } from "vue-toastification";
 import Table from "../../../components/Table.vue";
 import Button from "../../../components/Button.vue";
@@ -121,7 +120,13 @@ export default {
       isLoading: false,
       isSubmitting: false,
       error: null,
-      pagination: {},
+      pagination: {
+        current_page: 1,
+        per_page: 10,
+        total: 0,
+        last_page: 1,
+        links: [],
+      },
       showAddModal: false,
       showEditModal: false,
       showDetailModal: false,
@@ -145,13 +150,36 @@ export default {
   methods: {
     async loadUsers(page = 1) {
       this.isLoading = true;
+      this.error = null;
       try {
-        const res = await usersService.getAllUser(page);
+        const res = await usersService.getAllUser(
+          page,
+          this.pagination.per_page || 10
+        );
+        const payload = res.data;
 
-        this.users = res.data.data;
-        this.pagination = res.data;
+        this.users = payload.data || [];
+        this.pagination = {
+          current_page: payload.current_page,
+          per_page: payload.per_page,
+          total: payload.total,
+          last_page: payload.last_page,
+          links: payload.links || [],
+        };
       } catch (err) {
-        this.error = "Không thể tải dữ liệu người dùng";
+        if (err.response?.status === 404) {
+          this.users = [];
+          this.pagination = {
+            current_page: 1,
+            per_page: 10,
+            total: 0,
+            last_page: 1,
+            links: [],
+          };
+          this.error = err.response.data.message;
+        } else {
+          this.error = "Không thể tải dữ liệu người dùng";
+        }
         this.toast.error(this.error);
       } finally {
         this.isLoading = false;
@@ -174,7 +202,7 @@ export default {
     async handleEdit(user) {
       try {
         const res = await usersService.getUserById(user.id);
-        this.selectedUser = res.data || res;
+        this.selectedUser = res.data.data || res.data;
         this.showEditModal = true;
       } catch {
         this.toast.error("Không thể tải dữ liệu người dùng");
@@ -198,7 +226,7 @@ export default {
     async viewDetail(user) {
       try {
         const res = await usersService.getUserById(user.id);
-        this.selectedUser = res.data || res;
+        this.selectedUser = res.data.data || res.data;
         this.showDetailModal = true;
       } catch {
         this.toast.error("Không thể tải chi tiết người dùng");
@@ -223,12 +251,6 @@ export default {
       this.serverErrors = {};
       this.selectedUser = null;
     },
-  },
-
-  setup() {
-    // dùng useToast() ở đây vì Options API chưa có inject toast mặc định
-    const toast = useToast();
-    return { toast: toast };
   },
 };
 </script>

@@ -55,7 +55,7 @@
 
 <script>
 import { RouterLink } from "vue-router";
-import authService from "../services/authService";
+import authService from "../services/auth/authService";
 
 export default {
   name: "StaffLayout",

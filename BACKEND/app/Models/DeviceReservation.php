@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class DeviceReservation extends Model
 {
-    protected $table = 'device_reservation';
+    protected $table = 'device_reservations';
     protected $fillable = [
         'user_id',
         'reserved_from',
@@ -18,6 +18,12 @@ class DeviceReservation extends Model
         'is_no_show',
         'no_show_notes',
         'notes'
+    ];
+
+    protected $casts = [
+        'reserved_from' => 'datetime',
+        'reserved_until' => 'datetime',
+        'approved_at' => 'datetime',
     ];
     public function details()
     {

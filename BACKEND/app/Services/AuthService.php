@@ -11,20 +11,19 @@ class AuthService
 
     public function login(array $data)
     {
-        $validator = Validator::make($data, [
-            'email' => 'required|email',
-            'password' => 'required|string|min:6',
-        ]);
-
-        if ($validator->fails()) {
-            return ['error' => $validator->errors(), 'status' => 422];
+        if (! $token = auth('api')->attempt($data)) {
+            return [
+                'status' => false,
+                'message' => 'Sai email hoặc mật khẩu.',
+                'code' => 401
+            ];
         }
 
-        if (! $token = auth('api')->attempt($validator->validated())) {
-            return ['error' => 'Unauthorized', 'status' => 401];
-        }
-
-        return $this->createNewToken($token);
+        return [
+            'status' => true,
+            'message' => 'Đăng nhập thành công.',
+            'data' => $this->createNewToken($token)
+        ];
     }
 
     public function register(array $data)
@@ -78,6 +77,28 @@ class AuthService
         $user->update(['password' => bcrypt($data['new_password'])]);
 
         return ['message' => 'Password changed successfully', 'user' => $user];
+    }
+
+    public function updateProfile(array $data)
+    {
+        $validator = Validator::make($data, [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . auth('api')->id(),
+            'phone' => 'nullable|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return ['error' => $validator->errors(), 'status' => 422];
+        }
+
+        $user = auth('api')->user();
+        $user->update([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? $user->phone,
+        ]);
+
+        return ['message' => 'Profile updated successfully', 'user' => $user];
     }
 
     protected function createNewToken($token)

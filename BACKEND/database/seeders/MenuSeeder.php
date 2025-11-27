@@ -2,9 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Menu;
 use App\Models\MenuItem;
-use App\Models\MenuItemRole;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -13,94 +11,103 @@ class MenuSeeder extends Seeder
     public function run(): void
     {
         DB::transaction(function () {
-            $sidebar = Menu::updateOrCreate(
-                ['key' => 'sidebar'],
-                ['name' => 'Sidebar', 'is_active' => true]
-            );
+            // Clear existing menu items
+            MenuItem::query()->delete();
 
-            $items = [
-                [
-                    'label' => 'Dashboard',
-                    'route' => '/dashboard',
-                    'icon' => 'mdi-view-dashboard',
-                    'children' => [],
-                    'roles' => ['admin', 'staff', 'borrower'],
-                ],
-                [
-                    'label' => 'Users',
-                    'route' => '/admin/users',
-                    'icon' => 'mdi-account',
-                    'children' => [],
-                    'roles' => ['admin'],
-                ],
-                [
-                    'label' => 'Devices',
-                    'route' => '/admin/devices',
-                    'icon' => 'mdi-usb',
-                    'children' => [
-                        [
-                            'label' => 'Categories',
-                            'route' => '/admin/device-categories',
-                            'icon' => 'mdi-shape',
-                            'roles' => ['admin', 'staff'],
-                        ],
-                        [
-                            'label' => 'Units',
-                            'route' => '/admin/device-units',
-                            'icon' => 'mdi-cube',
-                            'roles' => ['admin', 'staff'],
-                        ],
-                    ],
-                    'roles' => ['admin', 'staff'],
-                ],
-                [
-                    'label' => 'Borrow',
-                    'route' => '/borrow',
-                    'icon' => 'mdi-clipboard',
-                    'children' => [],
-                    'roles' => ['borrower', 'admin'],
-                ],
-            ];
+            // Dashboard
+            MenuItem::create([
+                'parent_id' => null,
+                'label' => 'Trang chủ',
+                'url' => '/dashboard',
+                'icon' => 'chart-line',
+                'sort_order' => 1,
+                'is_active' => true,
+            ]);
 
-            $order = 0;
-            foreach ($items as $itemData) {
-                $item = MenuItem::updateOrCreate(
-                    ['menu_id' => $sidebar->id, 'label' => $itemData['label']],
-                    [
-                        'menu_id' => $sidebar->id,
-                        'parent_id' => null,
-                        'label' => $itemData['label'],
-                        'route' => $itemData['route'],
-                        'icon' => $itemData['icon'] ?? null,
-                        'display_order' => $order++,
-                        'is_active' => true,
-                    ]
-                );
-                MenuItemRole::where('menu_item_id', $item->id)->delete();
-                foreach ($itemData['roles'] as $role) {
-                    MenuItemRole::create(['menu_item_id' => $item->id, 'role' => $role]);
-                }
+            // Device Management with children
+            $deviceMenu = MenuItem::create([
+                'parent_id' => null,
+                'label' => 'Quản lý Thiết bị',
+                'url' => null,
+                'icon' => 'boxes',
+                'sort_order' => 2,
+                'is_active' => true,
+            ]);
 
-                $childOrder = 0;
-                foreach ($itemData['children'] as $child) {
-                    $childItem = MenuItem::updateOrCreate(
-                        ['menu_id' => $sidebar->id, 'parent_id' => $item->id, 'label' => $child['label']],
-                        [
-                            'menu_id' => $sidebar->id,
-                            'parent_id' => $item->id,
-                            'label' => $child['label'],
-                            'route' => $child['route'],
-                            'icon' => $child['icon'] ?? null,
-                            'display_order' => $childOrder++,
-                            'is_active' => true,
-                        ]
-                    );
-                    MenuItemRole::where('menu_item_id', $childItem->id)->delete();
-                    foreach ($child['roles'] as $role) {
-                        MenuItemRole::create(['menu_item_id' => $childItem->id, 'role' => $role]);
-                    }
-                }
-            }
+            MenuItem::create([
+                'parent_id' => $deviceMenu->id,
+                'label' => 'Danh mục Thiết bị',
+                'url' => '/devices/categories',
+                'icon' => 'list',
+                'sort_order' => 1,
+                'is_active' => true,
+            ]);
+
+            MenuItem::create([
+                'parent_id' => $deviceMenu->id,
+                'label' => 'Danh sách Thiết bị',
+                'url' => '/devices',
+                'icon' => 'microchip',
+                'sort_order' => 2,
+                'is_active' => true,
+            ]);
+
+            MenuItem::create([
+                'parent_id' => $deviceMenu->id,
+                'label' => 'Đơn vị Thiết bị',
+                'url' => '/device-units',
+                'icon' => 'cube',
+                'sort_order' => 3,
+                'is_active' => true,
+            ]);
+
+            // Borrow Management with children
+            $borrowMenu = MenuItem::create([
+                'parent_id' => null,
+                'label' => 'Quản lý Mượn/Trả',
+                'url' => null,
+                'icon' => 'exchange-alt',
+                'sort_order' => 3,
+                'is_active' => true,
+            ]);
+
+            MenuItem::create([
+                'parent_id' => $borrowMenu->id,
+                'label' => 'Phiếu Mượn',
+                'url' => '/borrows',
+                'icon' => 'file-alt',
+                'sort_order' => 1,
+                'is_active' => true,
+            ]);
+
+            MenuItem::create([
+                'parent_id' => $borrowMenu->id,
+                'label' => 'Đặt trước Thiết bị',
+                'url' => '/reservations',
+                'icon' => 'calendar-alt',
+                'sort_order' => 2,
+                'is_active' => true,
+            ]);
+
+            // Users Management
+            MenuItem::create([
+                'parent_id' => null,
+                'label' => 'Quản lý Người dùng',
+                'url' => '/users',
+                'icon' => 'users',
+                'sort_order' => 4,
+                'is_active' => true,
+            ]);
+
+            // Settings
+            MenuItem::create([
+                'parent_id' => null,
+                'label' => 'Cài đặt',
+                'url' => '/settings',
+                'icon' => 'cog',
+                'sort_order' => 5,
+                'is_active' => true,
+            ]);
         });
     }
 }

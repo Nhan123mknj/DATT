@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1:3307
--- Thời gian đã tạo: Th10 29, 2025 lúc 05:14 AM
+-- Thời gian đã tạo: Th10 15, 2025 lúc 07:25 AM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.2.12
 
@@ -24,6 +24,37 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
+-- Cấu trúc bảng cho bảng `approval_queue`
+--
+
+CREATE TABLE `approval_queue` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `requestable_id` bigint(20) UNSIGNED NOT NULL,
+  `approver_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  `priority` enum('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
+  `approved_at` timestamp NULL DEFAULT NULL,
+  `reason` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `approval_queues`
+--
+
+CREATE TABLE `approval_queues` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Cấu trúc bảng cho bảng `borrows`
 --
 
@@ -32,24 +63,22 @@ CREATE TABLE `borrows` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `borrower_id` bigint(20) UNSIGNED NOT NULL,
-  `approved_by` bigint(20) UNSIGNED DEFAULT NULL,
-  `approved_at` timestamp NULL DEFAULT NULL,
-  `rejection_reason` text DEFAULT NULL,
-  `borrowed_date` date NOT NULL,
+  `borrowed_date` date DEFAULT NULL,
   `expected_return_date` date NOT NULL COMMENT 'Ngay du dinh tra ',
   `actual_return_date` date DEFAULT NULL COMMENT 'Ngay tra thuc su',
   `status` enum('pending','approved','rejected','borrowed','returned','canceled') NOT NULL DEFAULT 'pending',
   `notes` text DEFAULT NULL,
-  `deleted_at` timestamp NULL DEFAULT NULL
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `commitment_file` varchar(255) DEFAULT NULL COMMENT 'Đường dẫn file cam kết (nếu có)',
+  `proof_image` varchar(255) DEFAULT NULL COMMENT 'Ảnh chụp thiết bị khi mượn'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Đang đổ dữ liệu cho bảng `borrows`
 --
 
-INSERT INTO `borrows` (`id`, `created_at`, `updated_at`, `borrower_id`, `approved_by`, `approved_at`, `rejection_reason`, `borrowed_date`, `expected_return_date`, `actual_return_date`, `status`, `notes`, `deleted_at`) VALUES
-(2, '2025-09-24 09:12:33', '2025-09-24 09:12:33', 7, NULL, NULL, NULL, '2025-09-24', '2025-10-01', NULL, 'borrowed', 'Mượn để làm đồ án', NULL),
-(8, '2025-09-27 07:08:40', '2025-09-27 07:08:40', 1, NULL, NULL, NULL, '2025-09-27', '2025-10-01', NULL, 'pending', 'Mượn để làm đồ án', NULL);
+INSERT INTO `borrows` (`id`, `created_at`, `updated_at`, `borrower_id`, `borrowed_date`, `expected_return_date`, `actual_return_date`, `status`, `notes`, `deleted_at`, `commitment_file`, `proof_image`) VALUES
+(13, '2025-10-31 08:40:30', '2025-10-31 08:40:30', 7, NULL, '2025-11-10', NULL, 'pending', 'Test mượn laptop cho dự án', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -68,17 +97,17 @@ CREATE TABLE `borrow_details` (
   `status` enum('borrowed','returned','pending') NOT NULL DEFAULT 'pending',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
-  `deleted_at` timestamp NULL DEFAULT NULL
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `proof_image_borrow` varchar(255) DEFAULT NULL COMMENT 'Ảnh chụp thiết bị khi mượn'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Đang đổ dữ liệu cho bảng `borrow_details`
 --
 
-INSERT INTO `borrow_details` (`id`, `borrow_id`, `device_unit_id`, `condition_at_borrow`, `condition_at_return`, `notes`, `returned_at`, `status`, `created_at`, `updated_at`, `deleted_at`) VALUES
-(3, 2, 5, 'tốt', NULL, NULL, NULL, 'borrowed', '2025-09-24 09:12:33', '2025-09-24 09:12:33', NULL),
-(4, 2, 8, 'trầy xước nhẹ', NULL, NULL, NULL, 'borrowed', '2025-09-24 09:12:33', '2025-09-24 09:12:33', NULL),
-(7, 8, 12, 'tốt', NULL, NULL, NULL, 'pending', '2025-09-27 07:08:40', '2025-09-27 07:08:40', NULL);
+INSERT INTO `borrow_details` (`id`, `borrow_id`, `device_unit_id`, `condition_at_borrow`, `condition_at_return`, `notes`, `returned_at`, `status`, `created_at`, `updated_at`, `deleted_at`, `proof_image_borrow`) VALUES
+(1, 13, 1, 'tốt', NULL, NULL, NULL, 'borrowed', '2025-10-31 08:40:30', '2025-10-31 08:40:30', NULL, NULL),
+(2, 13, 2, 'hơi xước', NULL, NULL, NULL, 'borrowed', '2025-10-31 08:40:30', '2025-10-31 08:40:30', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -97,19 +126,7 @@ CREATE TABLE `cache` (
 --
 
 INSERT INTO `cache` (`key`, `value`, `expiration`) VALUES
-('laravel-cache-5Am8h1DFYj5cdvRD', 'a:1:{s:11:\"valid_until\";i:1758813244;}', 1760022604),
-('laravel-cache-APbiv5Q3aCxPT6XR', 'a:1:{s:11:\"valid_until\";i:1758856061;}', 1760065721),
-('laravel-cache-CLnppvOd9YxT4E64', 'a:1:{s:11:\"valid_until\";i:1758113503;}', 1759322863),
-('laravel-cache-EKlQHZ167aMm0Iek', 'a:1:{s:11:\"valid_until\";i:1758729519;}', 1759939179),
-('laravel-cache-get6ioWgNatH68Ln', 'a:1:{s:11:\"valid_until\";i:1758104038;}', 1759312558),
-('laravel-cache-INUZ1RmS23znxfkT', 'a:1:{s:11:\"valid_until\";i:1758115017;}', 1759324077),
-('laravel-cache-kB5VSx57qaUPwFf6', 'a:1:{s:11:\"valid_until\";i:1758637238;}', 1759846898),
-('laravel-cache-ko5d7zqAZnV6cCwd', 'a:1:{s:11:\"valid_until\";i:1758729006;}', 1759938546),
-('laravel-cache-n42fytIojf6tTiW5', 'a:1:{s:11:\"valid_until\";i:1758855770;}', 1760065370),
-('laravel-cache-Nq9qGoj3OI0DkXYq', 'a:1:{s:11:\"valid_until\";i:1758637766;}', 1759847426),
-('laravel-cache-o6ncswMXmPl6tF4w', 'a:1:{s:11:\"valid_until\";i:1758855828;}', 1760065488),
-('laravel-cache-REOS8uLsJVk25Bpo', 'a:1:{s:11:\"valid_until\";i:1758637027;}', 1759846687),
-('laravel-cache-tT1UopGABZeASWTx', 'a:1:{s:11:\"valid_until\";i:1758856025;}', 1760065505);
+('laravel-cache-uFETg6tArkhYcr7p', 'a:1:{s:11:\"valid_until\";i:1761912387;}', 1763121567);
 
 -- --------------------------------------------------------
 
@@ -133,6 +150,7 @@ CREATE TABLE `devices` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `category_id` bigint(20) UNSIGNED NOT NULL,
   `name` varchar(255) NOT NULL,
+  `price` decimal(15,2) NOT NULL DEFAULT 0.00,
   `model` varchar(255) NOT NULL,
   `manufacturer` varchar(255) NOT NULL,
   `specifications` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`specifications`)),
@@ -147,18 +165,10 @@ CREATE TABLE `devices` (
 -- Đang đổ dữ liệu cho bảng `devices`
 --
 
-INSERT INTO `devices` (`id`, `category_id`, `name`, `model`, `manufacturer`, `specifications`, `is_active`, `total_units`, `created_at`, `updated_at`, `deleted_at`) VALUES
-(1, 16, 'exercitationem perspiciatis magni', '471vp', 'Epson', '{\"CPU\":\"Ryzen 5\",\"RAM\":\"8GB\",\"Storage\":\"512GB SSD\",\"Display\":\"13.3 inch FHD\"}', 1, 2, '2025-09-18 03:07:48', '2025-09-20 06:29:54', NULL),
-(2, 16, 'ex accusamus sint', 'Model-505zt', 'Sony', '{\"CPU\":\"Intel i7\",\"RAM\":\"8GB\",\"Storage\":\"512GB SSD\",\"Display\":\"13.3 inch FHD\"}', 1, 2, '2025-09-18 03:07:48', '2025-09-18 03:07:48', NULL),
-(3, 16, 'error commodi et', 'Model-247mg', 'Dell', '{\"CPU\":\"Intel i7\",\"RAM\":\"32GB\",\"Storage\":\"512GB SSD\",\"Display\":\"13.3 inch FHD\"}', 1, 3, '2025-09-18 03:07:48', '2025-09-18 03:07:48', NULL),
-(4, 16, 'blanditiis commodi animi', 'Model-450tj', 'Dell', '{\"CPU\":\"Ryzen 5\",\"RAM\":\"32GB\",\"Storage\":\"1TB SSD\",\"Display\":\"13.3 inch FHD\"}', 1, 2, '2025-09-18 03:07:48', '2025-09-18 03:07:48', NULL),
-(5, 18, 'voluptatum et et', 'Model-690xa', 'HP', '{\"CPU\":\"Intel i5\",\"RAM\":\"32GB\",\"Storage\":\"512GB SSD\",\"Display\":\"15.6 inch FHD\"}', 1, 3, '2025-09-18 03:07:48', '2025-09-18 03:07:48', NULL),
-(6, 17, 'facere voluptatem ut', 'Model-316ac', 'Dell', '{\"CPU\":\"Ryzen 5\",\"RAM\":\"8GB\",\"Storage\":\"512GB SSD\",\"Display\":\"27 inch 4K\"}', 1, 2, '2025-09-18 03:07:48', '2025-09-18 03:07:48', NULL),
-(7, 16, 'qui optio aut', 'Model-093ly', 'JBL', '{\"CPU\":\"Intel i5\",\"RAM\":\"32GB\",\"Storage\":\"256GB SSD\",\"Display\":\"27 inch 4K\"}', 1, 1, '2025-09-18 03:07:48', '2025-09-18 03:07:48', NULL),
-(8, 20, 'at non animi', 'Model-456ny', 'JBL', '{\"CPU\":\"Ryzen 5\",\"RAM\":\"8GB\",\"Storage\":\"512GB SSD\",\"Display\":\"27 inch 4K\"}', 1, 1, '2025-09-18 03:07:48', '2025-09-18 03:07:48', NULL),
-(9, 19, 'accusantium minus impedit', 'Model-389ue', 'Sony', '{\"CPU\":\"Ryzen 5\",\"RAM\":\"32GB\",\"Storage\":\"256GB SSD\",\"Display\":\"15.6 inch FHD\"}', 1, 1, '2025-09-18 03:07:48', '2025-09-18 03:07:48', NULL),
-(10, 20, 'blanditiis unde illum', 'Model-814od', 'Dell', '{\"CPU\":\"Ryzen 5\",\"RAM\":\"32GB\",\"Storage\":\"1TB SSD\",\"Display\":\"13.3 inch FHD\"}', 1, 3, '2025-09-18 03:07:48', '2025-09-18 03:07:48', NULL),
-(11, 17, 'Kính hiển vi', 'CX23', 'Olympus', '{\"Loại\": \"Quang học 2 mắt\",\n    \"Độ phóng đại\": \"40x – 1000x\",\n    \"Vật kính\": \"4x, 10x, 40x, 100x\",\n    \"Nguồn sáng\": \"LED 1W\"}', 1, 0, '2025-09-20 03:29:54', '2025-09-20 03:29:54', NULL);
+INSERT INTO `devices` (`id`, `category_id`, `name`, `price`, `model`, `manufacturer`, `specifications`, `is_active`, `total_units`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 1, 'Laptop Dell XPS 13', 20000000.00, 'XPS13-2022', 'Dell', '{\"CPU\":\"Intel i7\",\"RAM\":\"16GB\",\"Storage\":\"512GB SSD\"}', 1, 0, '2025-10-29 23:28:21', '2025-10-29 23:28:21', NULL),
+(2, 2, 'Máy phân tích phổ', 150000000.00, 'SPEC-5000', 'Agilent', '{\"Type\":\"Ph\\u00e2n t\\u00edch ph\\u1ed5\",\"C\\u00f4ng su\\u1ea5t\":\"5000W\"}', 1, 0, '2025-10-29 23:28:21', '2025-10-29 23:28:21', NULL),
+(3, 3, 'Hộp khẩu trang y tế', 50000.00, 'MASK-2025', 'VinMask', '{\"Lo\\u1ea1i\":\"Kh\\u1ea9u trang\",\"S\\u1ed1 l\\u01b0\\u1ee3ng\":\"50 c\\u00e1i\\/h\\u1ed9p\"}', 1, 0, '2025-10-29 23:28:21', '2025-10-29 23:28:21', NULL);
 
 -- --------------------------------------------------------
 
@@ -170,6 +180,10 @@ CREATE TABLE `device_categories` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `name` varchar(255) NOT NULL,
   `code` varchar(255) NOT NULL,
+  `type` enum('normal','consumable','expensive') NOT NULL DEFAULT 'normal',
+  `deposit_rate` decimal(5,2) NOT NULL DEFAULT 0.00 COMMENT 'Tỷ lệ đặt cọc (%)',
+  `max_borrow_duration` int(11) NOT NULL DEFAULT 7 COMMENT 'Số ngày tối đa được mượn',
+  `requires_approval` tinyint(1) NOT NULL DEFAULT 1,
   `description` text DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NULL DEFAULT NULL,
@@ -181,13 +195,74 @@ CREATE TABLE `device_categories` (
 -- Đang đổ dữ liệu cho bảng `device_categories`
 --
 
-INSERT INTO `device_categories` (`id`, `name`, `code`, `description`, `is_active`, `created_at`, `updated_at`, `deleted_at`) VALUES
-(16, 'a', 'MAN413', 'Nemo expedita corrupti cupiditate in aut et mollitia nihil.', 0, '2025-09-18 02:58:58', '2025-09-20 01:41:21', NULL),
-(17, 'Thiết bị hỗ trợ thí nghiệm', 'MIC776', 'Dicta voluptatem sit quo quo veritatis rem.', 1, '2025-09-18 02:58:58', '2025-09-18 02:58:58', NULL),
-(18, 'Thiết bị trình chiếu/giảng dạy', 'LOA234', 'Voluptatem sit quas delectus pariatur.', 1, '2025-09-18 02:58:58', '2025-09-18 02:58:58', NULL),
-(19, 'Thiết bị văn phòng/sự kiện', 'LAP989', 'Qui placeat neque rerum.', 1, '2025-09-18 02:58:58', '2025-09-18 02:58:58', NULL),
-(20, 'Máy chiếu', 'MAY276', 'Molestias quis fuga dolorem libero.', 1, '2025-09-18 02:58:58', '2025-09-18 02:58:58', NULL),
-(21, 'Thiết bị A', '123a', 'Thiết bị dùng cho viecj làm việc A', 1, '2025-09-18 09:57:59', '2025-09-18 09:57:59', NULL);
+INSERT INTO `device_categories` (`id`, `name`, `code`, `type`, `deposit_rate`, `max_borrow_duration`, `requires_approval`, `description`, `is_active`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Thiết bị tiêu hao', 'CONSUMABLE', 'consumable', 0.00, 0, 0, 'Các thiết bị sử dụng một lần như hóa chất, văn phòng phẩm', 1, '2025-10-29 23:28:20', '2025-10-29 23:28:20', NULL),
+(2, 'Thiết bị giá trị cao', 'EXPENSIVE', 'expensive', 50.00, 30, 1, 'Các thiết bị có giá trị cao như máy phân tích, kính hiển vi điện tử', 1, '2025-10-29 23:28:20', '2025-10-29 23:28:20', NULL),
+(3, 'Thiết bị thông thường', 'NORMAL', 'normal', 0.00, 14, 1, 'Các thiết bị thông dụng như máy tính, màn hình', 1, '2025-10-29 23:28:20', '2025-10-29 23:28:20', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `device_maintenances`
+--
+
+CREATE TABLE `device_maintenances` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `device_unit_id` bigint(20) UNSIGNED NOT NULL,
+  `reported_by` bigint(20) UNSIGNED NOT NULL,
+  `assigned_to` bigint(20) UNSIGNED DEFAULT NULL,
+  `type` enum('routine','repair','inspection','damage_report') NOT NULL,
+  `status` enum('pending','in_progress','completed','cancelled') NOT NULL DEFAULT 'pending',
+  `priority` enum('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
+  `start_date` datetime DEFAULT NULL,
+  `end_date` datetime DEFAULT NULL,
+  `description` text NOT NULL,
+  `cost` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `next_maintenance_date` date DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `device_reservations`
+--
+
+CREATE TABLE `device_reservations` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `user_id` bigint(20) UNSIGNED NOT NULL,
+  `reserved_from` datetime NOT NULL,
+  `reserved_until` datetime NOT NULL,
+  `status` enum('pending','approved','rejected','cancelled','completed','no_show') DEFAULT 'pending',
+  `approved_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `approved_at` timestamp NULL DEFAULT NULL,
+  `checked_in_at` timestamp NULL DEFAULT NULL,
+  `is_no_show` tinyint(1) DEFAULT 0,
+  `no_show_notes` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `device_reservation_details`
+--
+
+CREATE TABLE `device_reservation_details` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `reservation_id` bigint(20) UNSIGNED NOT NULL,
+  `device_unit_id` bigint(20) UNSIGNED NOT NULL,
+  `status` enum('pending','approved','cancelled','completed') DEFAULT 'pending',
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -205,35 +280,22 @@ CREATE TABLE `device_units` (
   `notes` text DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
-  `deleted_at` timestamp NULL DEFAULT NULL
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `reserved_until` datetime DEFAULT NULL,
+  `reserved_by_user_id` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Đang đổ dữ liệu cho bảng `device_units`
 --
 
-INSERT INTO `device_units` (`id`, `device_id`, `serial_number`, `status`, `purchase_date`, `warranty_end`, `notes`, `created_at`, `updated_at`, `deleted_at`) VALUES
-(1, 5, 'SN-085-FBJ', 'in_use', '2023-04-09', '2026-10-13', 'Cum commodi autem quia voluptas ut qui.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(2, 10, 'SN-491-TFN', 'maintenance', '2025-03-28', '2026-05-01', 'Molestiae sed quibusdam aliquam corrupti incidunt aut.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(3, 4, 'SN-895-JNR', 'broken', '2023-04-13', '2026-10-18', 'Ut in sunt rerum id.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(4, 8, 'SN-928-HNT', 'broken', '2024-06-07', '2027-05-07', 'Quisquam vel aut dolore dolorem sunt voluptatem alias.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(5, 6, 'SN-277-FQE', 'borrowed', '2023-08-13', '2027-04-19', 'Qui quae consequatur quis et.', '2025-09-18 03:08:37', '2025-09-24 09:12:33', NULL),
-(6, 1, 'SN-490-SKB', 'broken', '2025-03-01', '2027-03-12', 'Adipisci voluptatem qui suscipit nobis.', '2025-09-18 03:08:37', '2025-09-20 06:29:54', '2025-09-20 06:29:54'),
-(7, 3, 'SN-386-HXB', 'broken', '2024-05-17', '2028-06-22', 'Provident fugiat velit culpa.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(8, 5, 'SN-116-RVW', 'borrowed', '2023-03-04', '2027-09-19', 'Illum cum error omnis est.', '2025-09-18 03:08:37', '2025-09-24 09:12:33', NULL),
-(9, 2, 'SN-537-OWC', 'in_use', '2023-02-19', '2025-10-30', 'Facilis possimus esse nostrum maxime tempore voluptas.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(10, 5, 'SN-937-HGV', 'broken', '2024-04-15', '2028-01-05', 'Nihil labore aut voluptatem debitis et necessitatibus iusto.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(11, 3, 'SN-086-SGU', 'in_use', '2024-07-08', '2028-09-08', 'Consequatur laborum cupiditate velit consequatur officiis quisquam.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(12, 9, 'SN-410-ENC', 'available', '2022-11-06', '2026-05-20', 'Voluptatum culpa voluptatem consectetur quam laboriosam qui.', '2025-09-18 03:08:37', '2025-09-27 07:08:40', NULL),
-(13, 10, 'SN-153-BLI', 'broken', '2022-11-21', '2025-09-21', 'Quo nostrum necessitatibus est.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(14, 10, 'SN-326-AAN', 'available', '2024-08-28', '2026-05-08', 'Dolores laborum eius occaecati velit temporibus beatae.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(15, 3, 'SN-351-WVN', 'broken', '2023-11-14', '2027-02-10', 'Exercitationem sed ut voluptate qui libero non.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(16, 2, 'SN-075-WPL', 'available', '2024-05-12', '2028-04-04', 'Pariatur maxime mollitia et voluptates.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(17, 6, 'SN-932-QQD', 'maintenance', '2023-07-08', '2026-10-18', 'Aut tenetur qui voluptatibus aspernatur aliquid.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(18, 1, 'SN-503-TRD', 'maintenance', '2025-03-27', '2028-01-06', 'Odit adipisci voluptatum non eveniet sit blanditiis.', '2025-09-18 03:08:37', '2025-09-20 06:29:54', '2025-09-20 06:29:54'),
-(19, 4, 'SN-213-ZCM', 'in_use', '2023-06-22', '2025-11-06', 'Reprehenderit molestiae dolor eligendi et aut exercitationem accusamus.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(20, 7, 'SN-318-TGB', 'maintenance', '2022-10-11', '2028-05-16', 'Amet et fugit sapiente autem dolor tempore exercitationem.', '2025-09-18 03:08:37', '2025-09-18 03:08:37', NULL),
-(21, 11, 'VHX-X1', 'maintenance', NULL, NULL, NULL, '2025-09-20 06:51:17', '2025-09-20 06:56:57', NULL);
+INSERT INTO `device_units` (`id`, `device_id`, `serial_number`, `status`, `purchase_date`, `warranty_end`, `notes`, `created_at`, `updated_at`, `deleted_at`, `reserved_until`, `reserved_by_user_id`) VALUES
+(1, 1, 'SN-NORMAL-001', 'available', '2024-10-30', '2026-10-30', 'Thiết bị thường mẫu', '2025-10-29 23:28:21', '2025-10-31 08:40:30', NULL, NULL, NULL),
+(2, 1, 'SN-NORMAL-002', 'available', '2025-04-30', '2027-04-30', 'Thiết bị thường mẫu', '2025-10-29 23:28:21', '2025-10-31 08:40:30', NULL, NULL, NULL),
+(3, 2, 'SN-EXP-001', 'available', '2024-10-30', '2026-10-30', 'Thiết bị đắt tiền mẫu', '2025-10-29 23:28:21', '2025-10-29 23:28:21', NULL, NULL, NULL),
+(4, 2, 'SN-EXP-002', 'available', '2025-03-02', '2027-03-02', 'Thiết bị đắt tiền mẫu', '2025-10-29 23:28:21', '2025-10-29 23:28:21', NULL, NULL, NULL),
+(5, 3, 'SN-CONSUM-001', 'available', '2025-08-30', '2026-08-30', 'Thiết bị tiêu hao mẫu', '2025-10-29 23:28:21', '2025-10-29 23:28:21', NULL, NULL, NULL),
+(6, 3, 'SN-CONSUM-002', 'available', '2025-09-30', '2026-09-30', 'Thiết bị tiêu hao mẫu', '2025-10-29 23:28:21', '2025-10-29 23:28:21', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -281,6 +343,18 @@ CREATE TABLE `jobs` (
   `created_at` int(10) UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Đang đổ dữ liệu cho bảng `jobs`
+--
+
+INSERT INTO `jobs` (`id`, `queue`, `payload`, `attempts`, `reserved_at`, `available_at`, `created_at`) VALUES
+(1, 'default', '{\"uuid\":\"a2604d7c-8b2b-46d0-954a-ed56b8895ff8\",\"displayName\":\"App\\\\Notifications\\\\BorrowNotification\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:3;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:36:\\\"App\\\\Notifications\\\\BorrowNotification\\\":3:{s:7:\\\"message\\\";s:41:\\\"Fannie Farrell đã gửi phiếu mượn\\\";s:8:\\\"borrowId\\\";i:13;s:2:\\\"id\\\";s:36:\\\"9483efde-0341-4825-844b-d1d8751bb28b\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1761925231,\"delay\":null}', 0, NULL, 1761925231, 1761925231),
+(2, 'default', '{\"uuid\":\"eea1f66f-8512-417b-8472-1db69b5fed9a\",\"displayName\":\"App\\\\Notifications\\\\BorrowNotification\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:3;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:36:\\\"App\\\\Notifications\\\\BorrowNotification\\\":3:{s:7:\\\"message\\\";s:41:\\\"Fannie Farrell đã gửi phiếu mượn\\\";s:8:\\\"borrowId\\\";i:13;s:2:\\\"id\\\";s:36:\\\"9483efde-0341-4825-844b-d1d8751bb28b\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1761925231,\"delay\":null}', 0, NULL, 1761925231, 1761925231),
+(3, 'default', '{\"uuid\":\"9ad87b79-f10f-4f90-b8a5-82c8544d4b73\",\"displayName\":\"App\\\\Notifications\\\\BorrowNotification\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:4;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:36:\\\"App\\\\Notifications\\\\BorrowNotification\\\":3:{s:7:\\\"message\\\";s:41:\\\"Fannie Farrell đã gửi phiếu mượn\\\";s:8:\\\"borrowId\\\";i:13;s:2:\\\"id\\\";s:36:\\\"b6cc9ddb-f1e5-422d-92c1-167b96f8d3c7\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1761925231,\"delay\":null}', 0, NULL, 1761925231, 1761925231),
+(4, 'default', '{\"uuid\":\"8af2c2ce-b0f3-458d-bf41-fe070e06359c\",\"displayName\":\"App\\\\Notifications\\\\BorrowNotification\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:4;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:36:\\\"App\\\\Notifications\\\\BorrowNotification\\\":3:{s:7:\\\"message\\\";s:41:\\\"Fannie Farrell đã gửi phiếu mượn\\\";s:8:\\\"borrowId\\\";i:13;s:2:\\\"id\\\";s:36:\\\"b6cc9ddb-f1e5-422d-92c1-167b96f8d3c7\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1761925231,\"delay\":null}', 0, NULL, 1761925231, 1761925231),
+(5, 'default', '{\"uuid\":\"33b6435d-3381-4b97-8e27-41d424cd8ed0\",\"displayName\":\"App\\\\Notifications\\\\BorrowNotification\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:17;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:36:\\\"App\\\\Notifications\\\\BorrowNotification\\\":3:{s:7:\\\"message\\\";s:41:\\\"Fannie Farrell đã gửi phiếu mượn\\\";s:8:\\\"borrowId\\\";i:13;s:2:\\\"id\\\";s:36:\\\"cc7fefcd-a2cc-4eb9-b71c-649ac2bccfd6\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1761925231,\"delay\":null}', 0, NULL, 1761925231, 1761925231),
+(6, 'default', '{\"uuid\":\"9d5d5e61-44f8-46fd-83fc-d566bff54fb6\",\"displayName\":\"App\\\\Notifications\\\\BorrowNotification\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:17;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:36:\\\"App\\\\Notifications\\\\BorrowNotification\\\":3:{s:7:\\\"message\\\";s:41:\\\"Fannie Farrell đã gửi phiếu mượn\\\";s:8:\\\"borrowId\\\";i:13;s:2:\\\"id\\\";s:36:\\\"cc7fefcd-a2cc-4eb9-b71c-649ac2bccfd6\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1761925231,\"delay\":null}', 0, NULL, 1761925231, 1761925231);
+
 -- --------------------------------------------------------
 
 --
@@ -315,13 +389,6 @@ CREATE TABLE `menus` (
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
--- Đang đổ dữ liệu cho bảng `menus`
---
-
-INSERT INTO `menus` (`id`, `name`, `key`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'Sidebar', 'sidebar', 1, '2025-10-16 01:43:48', '2025-10-16 01:43:48');
-
 -- --------------------------------------------------------
 
 --
@@ -340,18 +407,6 @@ CREATE TABLE `menu_items` (
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
--- Đang đổ dữ liệu cho bảng `menu_items`
---
-
-INSERT INTO `menu_items` (`id`, `parent_id`, `label`, `route`, `icon`, `display_order`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, NULL, 'Dashboard', '/dashboard', 'mdi-view-dashboard', 0, 1, '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(2, NULL, 'Users', '/admin/users', 'mdi-account', 1, 1, '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(3, NULL, 'Devices', '/admin/devices', 'mdi-usb', 2, 1, '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(4, 3, 'Categories', '/admin/device-categories', 'mdi-shape', 0, 1, '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(5, 3, 'Units', '/admin/device-units', 'mdi-cube', 1, 1, '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(6, NULL, 'Borrow', '/borrow', 'mdi-clipboard', 3, 1, '2025-10-16 01:43:48', '2025-10-16 01:43:48');
-
 -- --------------------------------------------------------
 
 --
@@ -365,24 +420,6 @@ CREATE TABLE `menu_item_roles` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Đang đổ dữ liệu cho bảng `menu_item_roles`
---
-
-INSERT INTO `menu_item_roles` (`id`, `menu_item_id`, `role`, `created_at`, `updated_at`) VALUES
-(1, 1, 'admin', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(2, 1, 'staff', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(3, 1, 'borrower', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(4, 2, 'admin', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(5, 3, 'admin', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(6, 3, 'staff', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(7, 4, 'admin', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(8, 4, 'staff', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(9, 5, 'admin', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(10, 5, 'staff', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(11, 6, 'borrower', '2025-10-16 01:43:48', '2025-10-16 01:43:48'),
-(12, 6, 'admin', '2025-10-16 01:43:48', '2025-10-16 01:43:48');
 
 -- --------------------------------------------------------
 
@@ -413,7 +450,17 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
 (10, '2025_10_16_000001_create_menus_table', 6),
 (11, '2025_10_16_000002_create_menu_items_table', 6),
 (12, '2025_10_16_000003_create_menu_item_roles_table', 6),
-(13, '2025_10_26_101924_add_avatar_column', 7);
+(13, '2025_10_26_101924_add_avatar_column', 7),
+(14, '2025_10_29_054110_update_device_categories', 8),
+(15, '2025_10_29_054303_create_device_reservations', 8),
+(16, '2025_10_29_054342_create_approval_queue', 8),
+(17, '2025_10_29_054423_create_return_logs', 8),
+(18, '2025_10_29_054448_create_device_maintenances', 8),
+(19, '2025_10_29_054639_update_device_and_device_units', 8),
+(22, '2025_10_30_000001_refactor_devices_and_device_units_tables', 9),
+(23, '2025_10_30_000002_refactor_borrows_and_return_logs_tables', 9),
+(24, '2025_10_30_042807_update_column_commitment_file_proof_image', 10),
+(27, '2025_11_02_034727_create_approval_queues_table', 11);
 
 -- --------------------------------------------------------
 
@@ -430,6 +477,31 @@ CREATE TABLE `password_reset_tokens` (
 -- --------------------------------------------------------
 
 --
+-- Cấu trúc bảng cho bảng `return_logs`
+--
+
+CREATE TABLE `return_logs` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `borrow_id` bigint(20) UNSIGNED NOT NULL,
+  `device_unit_id` bigint(20) UNSIGNED NOT NULL,
+  `borrow_detail_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `returned_by` bigint(20) UNSIGNED NOT NULL,
+  `received_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `return_date` datetime NOT NULL,
+  `condition_before` enum('excellent','good','fair','poor') NOT NULL,
+  `condition_after` enum('excellent','good','fair','poor') NOT NULL,
+  `damage_description` text DEFAULT NULL,
+  `damage_fee` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `late_fee` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `status` enum('pending','completed','disputed') NOT NULL DEFAULT 'pending',
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Cấu trúc bảng cho bảng `sessions`
 --
 
@@ -441,14 +513,6 @@ CREATE TABLE `sessions` (
   `payload` longtext NOT NULL,
   `last_activity` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Đang đổ dữ liệu cho bảng `sessions`
---
-
-INSERT INTO `sessions` (`id`, `user_id`, `ip_address`, `user_agent`, `payload`, `last_activity`) VALUES
-('5FwysOMjTgfd7ZNX8ntlWysg5Ojue9ZWJnxHVfuk', 11, '127.0.0.1', 'PostmanRuntime/7.46.1', 'YTozOntzOjY6Il90b2tlbiI7czo0MDoidmtOUUw5TGxLOHhMWUJhdFdZT29zaGtmaEx3dXUzOTVMaGxvTVN6TSI7czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6MjE6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMCI7fXM6NjoiX2ZsYXNoIjthOjI6e3M6Mzoib2xkIjthOjA6e31zOjM6Im5ldyI7YTowOnt9fX0=', 1758214709),
-('SwbqPCowR6xTfi6X1OvfJTPzqCasdYoPTb29HZQi', NULL, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'YTozOntzOjY6Il90b2tlbiI7czo0MDoiOFUwNFNXYU5pNjNPaTVmeWg1S09UWXpZdm1HN25HdUY3ZG5JOWs5RCI7czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6MjE6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMCI7fXM6NjoiX2ZsYXNoIjthOjI6e3M6Mzoib2xkIjthOjA6e31zOjM6Im5ldyI7YTowOnt9fX0=', 1758190696);
 
 -- --------------------------------------------------------
 
@@ -497,12 +561,26 @@ INSERT INTO `users` (`id`, `name`, `email`, `avatar`, `email_verified_at`, `pass
 --
 
 --
+-- Chỉ mục cho bảng `approval_queue`
+--
+ALTER TABLE `approval_queue`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `approval_queue_approver_id_foreign` (`approver_by`),
+  ADD KEY `approval_queue_requestable_type_requestable_id_index` (`requestable_id`),
+  ADD KEY `approval_queue_status_index` (`status`);
+
+--
+-- Chỉ mục cho bảng `approval_queues`
+--
+ALTER TABLE `approval_queues`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Chỉ mục cho bảng `borrows`
 --
 ALTER TABLE `borrows`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `borrows_borrower_id_foreign` (`borrower_id`),
-  ADD KEY `borrows_approved_by_foreign` (`approved_by`);
+  ADD KEY `borrows_borrower_id_foreign` (`borrower_id`);
 
 --
 -- Chỉ mục cho bảng `borrow_details`
@@ -536,7 +614,39 @@ ALTER TABLE `devices`
 --
 ALTER TABLE `device_categories`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `device_categories_code_unique` (`code`);
+  ADD UNIQUE KEY `device_categories_code_unique` (`code`),
+  ADD KEY `device_categories_type_index` (`type`);
+
+--
+-- Chỉ mục cho bảng `device_maintenances`
+--
+ALTER TABLE `device_maintenances`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `device_maintenances_device_unit_id_foreign` (`device_unit_id`),
+  ADD KEY `device_maintenances_reported_by_foreign` (`reported_by`),
+  ADD KEY `device_maintenances_assigned_to_foreign` (`assigned_to`),
+  ADD KEY `device_maintenances_status_index` (`status`),
+  ADD KEY `device_maintenances_start_date_end_date_index` (`start_date`,`end_date`);
+
+--
+-- Chỉ mục cho bảng `device_reservations`
+--
+ALTER TABLE `device_reservations`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `device_reservations_status_index` (`status`),
+  ADD KEY `device_reservations_reserved_from_index` (`reserved_from`),
+  ADD KEY `device_reservations_reserved_until_index` (`reserved_until`),
+  ADD KEY `device_reservations_user_id_foreign` (`user_id`),
+  ADD KEY `device_reservations_approved_by_foreign` (`approved_by`);
+
+--
+-- Chỉ mục cho bảng `device_reservation_details`
+--
+ALTER TABLE `device_reservation_details`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_reservation_unit` (`device_unit_id`,`reservation_id`),
+  ADD KEY `device_reservation_details_device_unit_id_reservation_id_index` (`device_unit_id`,`reservation_id`),
+  ADD KEY `device_reservation_details_reservation_id_foreign` (`reservation_id`);
 
 --
 -- Chỉ mục cho bảng `device_units`
@@ -544,7 +654,9 @@ ALTER TABLE `device_categories`
 ALTER TABLE `device_units`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `device_units_serial_number_unique` (`serial_number`),
-  ADD KEY `device_units_device_id_foreign` (`device_id`);
+  ADD KEY `device_units_device_id_foreign` (`device_id`),
+  ADD KEY `device_units_reserved_by_user_id_foreign` (`reserved_by_user_id`),
+  ADD KEY `device_units_reserved_until_reserved_by_user_id_index` (`reserved_until`,`reserved_by_user_id`);
 
 --
 -- Chỉ mục cho bảng `failed_jobs`
@@ -601,6 +713,18 @@ ALTER TABLE `password_reset_tokens`
   ADD PRIMARY KEY (`email`);
 
 --
+-- Chỉ mục cho bảng `return_logs`
+--
+ALTER TABLE `return_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `return_logs_borrow_id_foreign` (`borrow_id`),
+  ADD KEY `return_logs_device_unit_id_foreign` (`device_unit_id`),
+  ADD KEY `return_logs_returned_by_foreign` (`returned_by`),
+  ADD KEY `return_logs_received_by_foreign` (`received_by`),
+  ADD KEY `return_logs_return_date_index` (`return_date`),
+  ADD KEY `return_logs_borrow_detail_id_foreign` (`borrow_detail_id`);
+
+--
 -- Chỉ mục cho bảng `sessions`
 --
 ALTER TABLE `sessions`
@@ -620,34 +744,64 @@ ALTER TABLE `users`
 --
 
 --
+-- AUTO_INCREMENT cho bảng `approval_queue`
+--
+ALTER TABLE `approval_queue`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT cho bảng `approval_queues`
+--
+ALTER TABLE `approval_queues`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT cho bảng `borrows`
 --
 ALTER TABLE `borrows`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT cho bảng `borrow_details`
 --
 ALTER TABLE `borrow_details`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT cho bảng `devices`
 --
 ALTER TABLE `devices`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT cho bảng `device_categories`
 --
 ALTER TABLE `device_categories`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT cho bảng `device_maintenances`
+--
+ALTER TABLE `device_maintenances`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT cho bảng `device_reservations`
+--
+ALTER TABLE `device_reservations`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT cho bảng `device_reservation_details`
+--
+ALTER TABLE `device_reservation_details`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT cho bảng `device_units`
 --
 ALTER TABLE `device_units`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT cho bảng `failed_jobs`
@@ -659,31 +813,37 @@ ALTER TABLE `failed_jobs`
 -- AUTO_INCREMENT cho bảng `jobs`
 --
 ALTER TABLE `jobs`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT cho bảng `menus`
 --
 ALTER TABLE `menus`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT cho bảng `menu_items`
 --
 ALTER TABLE `menu_items`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT cho bảng `menu_item_roles`
 --
 ALTER TABLE `menu_item_roles`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT cho bảng `migrations`
 --
 ALTER TABLE `migrations`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+
+--
+-- AUTO_INCREMENT cho bảng `return_logs`
+--
+ALTER TABLE `return_logs`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT cho bảng `users`
@@ -696,10 +856,15 @@ ALTER TABLE `users`
 --
 
 --
+-- Các ràng buộc cho bảng `approval_queue`
+--
+ALTER TABLE `approval_queue`
+  ADD CONSTRAINT `approval_queue_approver_id_foreign` FOREIGN KEY (`approver_by`) REFERENCES `users` (`id`);
+
+--
 -- Các ràng buộc cho bảng `borrows`
 --
 ALTER TABLE `borrows`
-  ADD CONSTRAINT `borrows_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`),
   ADD CONSTRAINT `borrows_borrower_id_foreign` FOREIGN KEY (`borrower_id`) REFERENCES `users` (`id`);
 
 --
@@ -716,10 +881,33 @@ ALTER TABLE `devices`
   ADD CONSTRAINT `devices_category_id_foreign` FOREIGN KEY (`category_id`) REFERENCES `device_categories` (`id`);
 
 --
+-- Các ràng buộc cho bảng `device_maintenances`
+--
+ALTER TABLE `device_maintenances`
+  ADD CONSTRAINT `device_maintenances_assigned_to_foreign` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `device_maintenances_device_unit_id_foreign` FOREIGN KEY (`device_unit_id`) REFERENCES `device_units` (`id`),
+  ADD CONSTRAINT `device_maintenances_reported_by_foreign` FOREIGN KEY (`reported_by`) REFERENCES `users` (`id`);
+
+--
+-- Các ràng buộc cho bảng `device_reservations`
+--
+ALTER TABLE `device_reservations`
+  ADD CONSTRAINT `device_reservations_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `device_reservations_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `device_reservation_details`
+--
+ALTER TABLE `device_reservation_details`
+  ADD CONSTRAINT `device_reservation_details_device_unit_id_foreign` FOREIGN KEY (`device_unit_id`) REFERENCES `device_units` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `device_reservation_details_reservation_id_foreign` FOREIGN KEY (`reservation_id`) REFERENCES `device_reservations` (`id`) ON DELETE CASCADE;
+
+--
 -- Các ràng buộc cho bảng `device_units`
 --
 ALTER TABLE `device_units`
-  ADD CONSTRAINT `device_units_device_id_foreign` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`);
+  ADD CONSTRAINT `device_units_device_id_foreign` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`),
+  ADD CONSTRAINT `device_units_reserved_by_user_id_foreign` FOREIGN KEY (`reserved_by_user_id`) REFERENCES `users` (`id`);
 
 --
 -- Các ràng buộc cho bảng `menu_items`
@@ -732,6 +920,16 @@ ALTER TABLE `menu_items`
 --
 ALTER TABLE `menu_item_roles`
   ADD CONSTRAINT `menu_item_roles_menu_item_id_foreign` FOREIGN KEY (`menu_item_id`) REFERENCES `menu_items` (`id`) ON DELETE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `return_logs`
+--
+ALTER TABLE `return_logs`
+  ADD CONSTRAINT `return_logs_borrow_detail_id_foreign` FOREIGN KEY (`borrow_detail_id`) REFERENCES `borrow_details` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `return_logs_borrow_id_foreign` FOREIGN KEY (`borrow_id`) REFERENCES `borrows` (`id`),
+  ADD CONSTRAINT `return_logs_device_unit_id_foreign` FOREIGN KEY (`device_unit_id`) REFERENCES `device_units` (`id`),
+  ADD CONSTRAINT `return_logs_received_by_foreign` FOREIGN KEY (`received_by`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `return_logs_returned_by_foreign` FOREIGN KEY (`returned_by`) REFERENCES `users` (`id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

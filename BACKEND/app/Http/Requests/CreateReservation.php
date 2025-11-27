@@ -12,7 +12,7 @@ class CreateReservation extends FormRequest
      */
     public function authorize(): bool
     {
-        return auth("api")->user()->role() === 'borrower';
+        return auth("api")->user()->role === 'borrower';
     }
 
     /**
@@ -42,11 +42,7 @@ class CreateReservation extends FormRequest
                 'required',
                 'integer',
                 'exists:device_units,id',
-                Rule::unique('device_reservation_details', 'device_unit_id')
-                    ->where(function ($query) {
-                        $query->whereRaw('? BETWEEN reserved_from AND reserved_until', [$this->reserved_from])
-                            ->orWhereRaw('? BETWEEN reserved_from AND reserved_until', [$this->reserved_until]);
-                    }),
+
             ],
             'notes' => 'nullable|string|max:1000',
             'commitment_file' => 'nullable|file|mimes:pdf,doc,docx|max:2048',

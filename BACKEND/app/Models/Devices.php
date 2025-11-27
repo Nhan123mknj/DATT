@@ -18,7 +18,6 @@ class Devices extends Model
         'specifications',
         'is_active',
         'total_units',
-        'deleted_at',
         'model',
         'code',
         'description',

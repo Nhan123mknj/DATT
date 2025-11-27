@@ -3,23 +3,38 @@
 
 namespace App\Services\Borrow\Strategies;
 
+use App\Models\Devices;
+use App\Models\DeviceUnits;
 use App\Services\Borrow\AbstractBorrowStrategy;
+use League\Config\Exception\ValidationException;
 
 class ExpensiveBorrowStrategy extends AbstractBorrowStrategy
 {
     public function validateBorrow(array $data): bool
     {
-        if ($this->device->quantity < $data['quantity']) {
-            throw new \Exception('Số lượng yêu cầu vượt quá số lượng tồn kho');
+        $deviceId = $data['device_id'];
+        $quantity = $data['quantity'];
+        $duration = $data['duration'];
+
+        $availableCount = DeviceUnits::where('device_id', $deviceId)
+            ->where('status', 'available')
+            ->count();
+
+        if ($quantity > $availableCount) {
+            $device = Devices::find($deviceId);
+            $deviceName = $device?->name;
+
+            throw ValidationException::withMessages([
+                'devices' => "Thiết bị '{$deviceName}' chỉ còn {$availableCount} cái khả dụng, không đủ {$quantity}."
+            ]);
         }
 
-        if ($data['duration'] > $this->getMaxBorrowDuration()) {
-            throw new \Exception('Thời gian mượn vượt quá quy định');
-        }
 
-        // Kiểm tra lịch sử mượn trả
-        if (!$this->checkBorrowHistory($data['user_id'])) {
-            throw new \Exception('Người dùng có lịch sử mượn trả không tốt');
+        $maxDays = $this->getMaxBorrowDuration();
+        if ($duration > $maxDays) {
+            throw ValidationException::withMessages([
+                'expected_return_date' => "Thời gian mượn không được vượt quá {$maxDays} ngày."
+            ]);
         }
 
         return true;

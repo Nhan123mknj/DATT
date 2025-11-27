@@ -6,18 +6,15 @@
       <div
         class="bg-white rounded-l-2xl flex flex-col items-center justify-center p-10 space-y-6 w-full max-w-md"
       >
-        <!-- Tiêu đề -->
         <h1 class="text-3xl font-bold text-center">Đăng nhập</h1>
         <p class="text-sm text-gray-500 text-center">
           Xin chào, đến với hệ thống
         </p>
 
-        <!-- Form -->
         <form
           @submit.prevent="handleLogin"
           class="flex flex-col w-full space-y-4 relative"
         >
-          <!-- Error Message -->
           <div
             v-if="errorMessage"
             class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"
@@ -25,7 +22,6 @@
             {{ errorMessage }}
           </div>
 
-          <!-- Username -->
           <input
             v-model="email"
             type="email"
@@ -34,7 +30,6 @@
             :disabled="isLoading"
           />
 
-          <!-- Password -->
           <div class="relative w-full">
             <input
               v-model="password"
@@ -43,7 +38,7 @@
               class="w-full px-4 py-3 rounded-lg bg-gray-100 border border-gray-300 placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 pr-10"
               :disabled="isLoading"
             />
-            <!-- Eye icon -->
+
             <button
               type="button"
               @click="togglePasswordVisibility"
@@ -55,8 +50,6 @@
               />
             </button>
           </div>
-
-          <!-- Button -->
           <button
             type="submit"
             :disabled="isLoading"
@@ -83,7 +76,7 @@
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import authService from "../services/authService.js";
+import authService from "../services/auth/authService.js";
 
 const router = useRouter();
 
@@ -110,7 +103,7 @@ const handleLogin = async () => {
     const result = await authService.login(email.value, password.value);
 
     if (result.success) {
-      if (result.success) router.push({ name: `${result.role}.dashboard` });
+      router.push({ name: `${result.role}.dashboard` });
     } else {
       errorMessage.value = result.error || "Đăng nhập thất bại";
     }

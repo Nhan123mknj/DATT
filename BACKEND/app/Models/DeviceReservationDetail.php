@@ -12,8 +12,8 @@ class DeviceReservationDetail extends Model
     {
         return $this->belongsTo(DeviceReservation::class);
     }
-    public function device_unit()
+    public function deviceUnit()
     {
-        return $this->belongsTo(DeviceUnits::class);
+        return $this->belongsTo(DeviceUnits::class, 'device_unit_id');
     }
 }

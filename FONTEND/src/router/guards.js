@@ -1,4 +1,4 @@
-import authService from '../services/authService.js'
+import authService from '../services/auth/authService.js'
 
 // Track if we've already verified token in this session
 let tokenVerified = false
@@ -86,18 +86,27 @@ export const redirectIfAuthenticated = (to, from, next) => {
   if (authService.isAuthenticated()) {
     const user = authService.getUser();
 
-    switch (user.role) {
+    let targetRoute;
+    switch (user?.role) {
       case 'admin':
-        next({ name: 'admin.dashboard' });
+        targetRoute = 'admin.dashboard';
         break;
       case 'staff':
-        next({ name: 'staff.dashboard' });
+        targetRoute = 'staff.dashboard';
         break;
       case 'borrower':
-        next({ name: 'borrower.dashboard' });
+        targetRoute = 'borrower.dashboard';
         break;
       default:
-        next({ name: 'login' });
+        // Nếu role không hợp lệ, cho phép ở lại login
+        next();
+        return;
+    }
+
+    if (to.name !== targetRoute) {
+      next({ name: targetRoute });
+    } else {
+      next();
     }
     return;
   }

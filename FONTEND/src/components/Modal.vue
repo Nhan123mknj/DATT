@@ -1,18 +1,21 @@
 <template>
   <Transition name="modal">
     <div v-if="show" class="fixed inset-0 z-50 overflow-y-auto">
-      <!-- Overlay -->
       <div
-        class="fixed inset-0 bg-black bg-opacity-50"
+        class="fixed inset-0 bg-white/20 backdrop-blur-sm transition-opacity"
         @click="$emit('close')"
       ></div>
 
-      <!-- Modal Content -->
       <div class="flex items-center justify-center min-h-screen p-4">
         <div
-          class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto"
+          class="relative bg-white rounded-lg shadow-xl w-full mx-auto"
+          :class="{
+            'max-w-md': size === 'small' || !size,
+            'max-w-2xl': size === 'medium',
+            'max-w-4xl': size === 'large',
+            'max-w-6xl': size === 'xl',
+          }"
         >
-          <!-- Header -->
           <div class="flex items-center justify-between p-4 border-b">
             <h3 class="text-lg font-medium">{{ title }}</h3>
             <button
@@ -24,7 +27,7 @@
           </div>
 
           <!-- Body -->
-          <div class="p-4">
+          <div class="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
             <slot></slot>
           </div>
 
@@ -47,6 +50,11 @@ defineProps({
   title: {
     type: String,
     required: true,
+  },
+  size: {
+    type: String,
+    default: "small",
+    validator: (value) => ["small", "medium", "large", "xl"].includes(value),
   },
 });
 

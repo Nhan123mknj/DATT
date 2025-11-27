@@ -13,7 +13,11 @@ class DeviceCategoryService
 {
     public function listCategories($filters = [], $perPage = 15)
     {
-        $query = CategoriesDevice::with('devices')->orderBy('id', 'ASC');
+        $query = CategoriesDevice::with([
+            'devices:id,name,category_id'
+        ])
+            ->withCount('devices')
+            ->orderBy('id', 'ASC');
 
         $query = (new DeviceCategoryFilter($query, $filters))->apply();
 

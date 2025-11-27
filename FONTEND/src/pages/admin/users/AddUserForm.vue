@@ -143,7 +143,7 @@
 </template>
 
 <script>
-import { usersService } from "../../../services/usersService";
+import { usersService } from "../../../services/users/usersService";
 import { useToast } from "vue-toastification";
 
 export default {

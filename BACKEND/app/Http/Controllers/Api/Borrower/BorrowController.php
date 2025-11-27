@@ -36,16 +36,16 @@ class BorrowController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(BorrowRequest $request)
-    {
-        Gate::authorize('create', Borrows::class);
-        $borrow = $this->borrowService->createBorrowingSlip($request->all());
+    // public function store(BorrowRequest $request)
+    // {
+    //     Gate::authorize('create', Borrows::class);
+    //     $borrow = $this->borrowService->createBorrowingSlip($request->all());
 
-        return response()->json([
-            'messeger' => 'Phiếu mượn đã được tạo thành công',
-            'borrowSlip'  => $borrow,
-        ], 201);
-    }
+    //     return response()->json([
+    //         'messeger' => 'Phiếu mượn đã được tạo thành công',
+    //         'borrowSlip'  => $borrow,
+    //     ], 201);
+    // }
 
     /**
      * Display the specified resource.

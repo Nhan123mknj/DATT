@@ -20,7 +20,7 @@ class DeviceUnitsController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only(['device_id', 'status', 'is_active', 'search', 'order_by', 'direction']);
-        $perPage = $request->get('page', 10);
+        $perPage = $request->get('per_page', 10);
 
         $deviceUnits = $this->deviceUnitService->listUnits($filters, $perPage);
         if ($deviceUnits->isEmpty()) {

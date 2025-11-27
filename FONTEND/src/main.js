@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import './style.css'
 import router from './router/index.js'
 import App from './App.vue'
+import { initFlowbite } from 'flowbite'
 
 // Import vue-toastification
 import Toast from 'vue-toastification'
@@ -44,4 +45,8 @@ app.use(Toast, {
 })
 
 app.component('font-awesome-icon', FontAwesomeIcon)
+
+
 app.mount('#app')
+
+initFlowbite()

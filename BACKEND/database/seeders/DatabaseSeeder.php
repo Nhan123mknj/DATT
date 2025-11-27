@@ -20,9 +20,5 @@ class DatabaseSeeder extends Seeder
             DeviceUnitsSeeder::class,
             MenuSeeder::class,
         ]);
-
-        
-        
-        
     }
 }

@@ -2,43 +2,71 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MenuItem extends Model
 {
-    use HasFactory;
+    use SoftDeletes;
+
+    protected $table = 'menu_items';
 
     protected $fillable = [
-        'menu_id',
         'parent_id',
         'label',
-        'route',
+        'url',
         'icon',
-        'display_order',
+        'badge',
+        'badge_color',
+        'sort_order',
         'is_active',
+        'description',
     ];
 
-    public function menu(): BelongsTo
-    {
-        return $this->belongsTo(Menu::class);
-    }
+    protected $casts = [
+        'is_active' => 'boolean',
+        'sort_order' => 'integer',
+    ];
 
+    /**
+     * Get the parent menu item
+     */
     public function parent(): BelongsTo
     {
         return $this->belongsTo(MenuItem::class, 'parent_id');
     }
 
+    /**
+     * Get direct children
+     */
     public function children(): HasMany
     {
-        return $this->hasMany(MenuItem::class, 'parent_id')->orderBy('display_order');
+        return $this->hasMany(MenuItem::class, 'parent_id')->orderBy('sort_order');
     }
 
-    public function roles(): HasMany
+    /**
+     * Get all descendants recursively
+     */
+    public function childrenRecursive(): HasMany
     {
-        return $this->hasMany(MenuItemRole::class);
+        return $this->children()->with('childrenRecursive');
+    }
+
+    /**
+     * Check if this item has children
+     */
+    public function hasChildren(): bool
+    {
+        return $this->children()->exists();
+    }
+
+    /**
+     * Scope: Get active items only
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }
