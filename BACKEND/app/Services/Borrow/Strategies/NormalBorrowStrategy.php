@@ -41,7 +41,7 @@ class NormalBorrowStrategy extends AbstractBorrowStrategy
     }
     public function calculateDeposit(array $data): float
     {
-        return $this->device->price * 0.2 * $data['quantity']; // 20% giá trị thiết bị
+        return $this->device->price * 0.2 * $data['quantity']; 
     }
 
     public function processBorrow(array $data): array

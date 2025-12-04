@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ChangePasswordRequest;
 use App\Http\Requests\LoginRequest;
+use App\Http\Requests\UpdateUserRequest;
 use App\Http\Requests\UploadAvatarRequest;
 use App\Models\User;
 use App\Services\AuthService;
+use App\Services\MediaService;
 use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -16,11 +19,13 @@ class AuthController extends Controller
 {
     protected AuthService $authService;
     protected UserService $userService;
+    protected MediaService $mediaService;
 
-    public function __construct(AuthService $authService, UserService $userService)
+    public function __construct(AuthService $authService, UserService $userService, MediaService $mediaService)
     {
         $this->authService = $authService;
         $this->userService = $userService;
+        $this->mediaService = $mediaService;
         $this->middleware('auth:api', ['except' => ['login', 'register']]);
     }
 
@@ -56,17 +61,17 @@ class AuthController extends Controller
     {
         return response()->json([
             'status' => true,
-            'data' => auth('api')->user(),
+            'data' =>  auth('api')->user()->load('avatar'),
         ]);
     }
 
-    public function changePassword(Request $request)
+    public function changePassword(ChangePasswordRequest $request)
     {
         $result = $this->authService->changePassword($request->validated());
         return response()->json($result, $result['status'] ?? 200);
     }
 
-    public function updateProfile(Request $request)
+    public function updateProfile(UpdateUserRequest $request)
     {
         $result = $this->authService->updateProfile($request->validated());
         return response()->json($result, $result['status'] ?? 200);
@@ -78,28 +83,41 @@ class AuthController extends Controller
     public function uploadAvatar(UploadAvatarRequest $request)
     {
         $user = auth('api')->user();
-        if (!$user) {
-            return response()->json([
-                'message' => 'Unauthorized',
-            ], 401);
-        }
-        if (!$request->hasFile('avatar') || !$request->file('avatar')->isValid()) {
-            return response()->json([
-                'message' => 'Invalid file',
-            ], 400);
-        }
-        $result = $this->userService->uploadAvatar($user->id, $request->file('avatar'));
+        $file = $request->file('avatar');
 
-        if (!$result || !$result['success']) {
+        /** @var \App\Models\User $user */
+        $media = $this->mediaService->attachMedia($user, $file, 'avatar');
+
+        if (!$media) {
             return response()->json([
-                'message' => $result['message'] ?? 'Upload avatar thất bại'
+                'message' => 'Upload thất bại'
             ], 500);
         }
 
         return response()->json([
-            'message' => $result['message'],
-            'avatar_url' => $result['avatar_url'],
-            'user' => $user->fresh(['media']),
-        ], 200);
+            'message' => 'Upload avatar thành công',
+            'avatar' => [
+                'id' => $media->id,
+                'url' => $media->url,
+                'thumbnail' => $media->thumbnail,
+            ],
+        ]);
+    }
+    public function deleteAvatar()
+    {
+        $user = auth('api')->user();
+        /** @var \App\Models\User $user */
+        $this->mediaService->deleteMediaByType($user, 'avatar');
+
+        return response()->json(['message' => 'Đã xóa avatar']);
+    }
+    public function profile()
+    {
+        $user = auth('api')->user()->load('avatar');
+
+        return response()->json([
+            'user' => $user,
+            'avatar_url' => $user->avatar_url,
+        ]);
     }
 }

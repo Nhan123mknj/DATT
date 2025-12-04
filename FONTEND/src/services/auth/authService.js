@@ -50,7 +50,9 @@ class AuthService {
         await apiClient.post('/auth/logout')
       }
     } catch (error) {
-      console.warn('Logout request failed', error)
+      if (error.response?.status !== 401) {
+        console.warn('Logout request failed', error)
+      }
     } finally {
       user.value = null
       token.value = null
@@ -106,6 +108,13 @@ class AuthService {
       console.error('Token verification error:', error)
       await this.logout()
       return false
+    }
+  }
+
+  updateUser(userData) {
+    if (user.value) {
+      user.value = { ...user.value, ...userData }
+      persistAuth()
     }
   }
 }

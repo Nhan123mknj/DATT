@@ -4,19 +4,44 @@
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold">Danh sách người dùng</h1>
 
-      <Button
-        class="px-4 py-2"
-        label="Thêm mới"
-        color="primary"
-        @click="showAddModal = true"
-      />
+      <Button label="Thêm mới" @click="openCreate">
+        <template #icon>
+          <font-awesome-icon icon="plus" class="mr-2" />
+        </template>
+      </Button>
     </div>
-
     <div
-      v-if="error"
-      class="bg-red-100 border border-red-400 text-red-700 p-4 mb-4 rounded"
+      class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4 space-y-4"
     >
-      {{ error }}
+      <div class="grid gap-3 md:grid-cols-4">
+        <SearchBar v-on:handleSearch="handleSearch" />
+        <Dropdown
+          v-model="filters.role"
+          label="Vai trò"
+          :options="[
+            { label: 'Quản trị viên', value: 'admin' },
+            { label: 'Nhân viên', value: 'staff' },
+            { label: 'Người dùng', value: 'borrower' },
+          ]"
+          nameKey="label"
+          idKey="value"
+        />
+        <Dropdown
+          v-model="filters.is_active"
+          label="Trạng thái"
+          :options="[
+            { label: 'Kích hoạt', value: '1' },
+            { label: 'Vô hiệu hóa', value: '0' },
+          ]"
+          nameKey="label"
+          idKey="value"
+        />
+
+        <div class="flex gap-2">
+          <Button label="Đặt lại" @click="resetFilters" color="gray" />
+          <Button label="Lọc" @click="loadData()" />
+        </div>
+      </div>
     </div>
 
     <div>
@@ -25,7 +50,7 @@
         v-else
         :data="users"
         :headers="headers"
-        @edit="handleEdit"
+        @edit="openEdit"
         @delete="handleDelete"
       >
         <template #STT="{ index }">
@@ -33,10 +58,9 @@
         </template>
         <template #role="{ item }">{{ getRoleLabel(item.role) }}</template>
         <template #is_active="{ item }">{{
-          getActiveLabel(item.is_active)
+          statusActive(item.is_active)
         }}</template>
         <template #actions="{ item }">
-          <!-- Xem chi tiết -->
           <button
             @click="viewDetail(item)"
             class="px-2 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
@@ -45,16 +69,14 @@
             <font-awesome-icon icon="fa-solid fa-eye" />
           </button>
 
-          <!-- Sửa -->
           <button
-            @click="handleEdit(item)"
+            @click="openEdit(item)"
             class="px-2 py-1 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition"
             title="Chỉnh sửa"
           >
             <font-awesome-icon icon="fa-solid fa-pen" />
           </button>
 
-          <!-- Xóa -->
           <button
             @click="handleDelete(item)"
             class="px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition"
@@ -67,42 +89,42 @@
       <Pagination
         v-if="pagination.total && pagination.last_page > 1"
         :links="pagination.links"
-        @page-changed="loadUsers"
+        @page-changed="loadData"
       />
     </div>
   </div>
-
-  <!-- Form thêm -->
   <AddUserForm
-    :visible="showAddModal"
-    @close="closeModals"
-    @refresh="loadUsers"
+    :visible="showModal && modalMode === 'create'"
+    @close="closeModal"
+    @refresh="loadData"
   />
-
-  <!-- Form sửa -->
   <UpdateUserForm
-    v-if="selectedUser"
-    :visible="showEditModal"
-    :user-data="selectedUser"
-    :is-submitting="isSubmitting"
-    :server-errors="serverErrors"
-    @close="closeModals"
-    @submit="handleUpdateUser"
+    :visible="showModal && modalMode === 'edit'"
+    :user-data="form"
+    @close="closeModal"
+    @refresh="loadData"
   />
 </template>
 
 <script>
+import { ref, onMounted } from "vue";
 import { usersService } from "../../../services/users/usersService";
 import { useToast } from "vue-toastification";
-import Table from "../../../components/Table.vue";
-import Button from "../../../components/Button.vue";
-import LoadingSkeleton from "../../../components/LoadingSkeleton.vue";
-import AddUserForm from "./AddUserForm.vue";
-import UpdateUserForm from "./UpdateUserForm.vue";
-import Pagination from "../../../components/Pagination.vue";
+import Table from "../../../components/common/Table.vue";
+import Button from "../../../components/common/Button.vue";
+import LoadingSkeleton from "../../../components/common/LoadingSkeleton.vue";
+import AddUserForm from "../../../components/user/AddUserForm.vue";
+import UpdateUserForm from "../../../components/user/UpdateUserForm.vue";
+import Pagination from "../../../components/common/Pagination.vue";
+import Dropdown from "../../../components/common/Dropdown.vue";
+import SearchBar from "../../../components/common/SearchBar.vue";
+import { useDataTable } from "../../../composables/fetchData/useDataTable";
+import { useUserFilter } from "../../../composables/filter/useUserFilter";
+import { useStatusLabel } from "../../../composables/utils/statusLabel";
+import { useForm } from "../../../composables/useForm";
 
 export default {
-  name: "UserListPage",
+  name: "UsersIndex",
   components: {
     Table,
     Button,
@@ -110,147 +132,99 @@ export default {
     AddUserForm,
     UpdateUserForm,
     Pagination,
-  },
-
-  data() {
-    return {
-      users: [],
-      selectedUser: null,
-      serverErrors: {},
-      isLoading: false,
-      isSubmitting: false,
-      error: null,
-      pagination: {
-        current_page: 1,
-        per_page: 10,
-        total: 0,
-        last_page: 1,
-        links: [],
-      },
-      showAddModal: false,
-      showEditModal: false,
-      showDetailModal: false,
-
-      headers: {
-        name: "Tên",
-        email: "Email",
-        role: "Vai trò",
-        is_active: "Trạng thái",
-      },
-    };
-  },
-
-  mounted() {
-    this.loadUsers();
+    Dropdown,
+    SearchBar,
   },
   setup() {
+    const { filters, resetFilters } = useUserFilter();
+    const { statusActive, getRoleLabel } = useStatusLabel();
     const toast = useToast();
-    return { toast };
-  },
-  methods: {
-    async loadUsers(page = 1) {
-      this.isLoading = true;
-      this.error = null;
-      try {
-        const res = await usersService.getAllUser(
-          page,
-          this.pagination.per_page || 10
-        );
-        const payload = res.data;
 
-        this.users = payload.data || [];
-        this.pagination = {
-          current_page: payload.current_page,
-          per_page: payload.per_page,
-          total: payload.total,
-          last_page: payload.last_page,
-          links: payload.links || [],
-        };
-      } catch (err) {
-        if (err.response?.status === 404) {
-          this.users = [];
-          this.pagination = {
-            current_page: 1,
-            per_page: 10,
-            total: 0,
-            last_page: 1,
-            links: [],
-          };
-          this.error = err.response.data.message;
-        } else {
-          this.error = "Không thể tải dữ liệu người dùng";
-        }
-        this.toast.error(this.error);
-      } finally {
-        this.isLoading = false;
-      }
-    },
+    const selectedUser = ref(null);
+    const showDetailModal = ref(false);
 
-    getRoleLabel(role) {
-      const map = {
-        admin: "Quản trị viên",
-        staff: "Nhân viên",
-        borrower: "Người dùng",
-      };
-      return map[role] || role;
-    },
+    const {
+      items: users,
+      isLoading,
+      pagination,
+      loadData,
+      deleteItem,
+    } = useDataTable({
+      fetchData: (params) =>
+        usersService.getAllUser({
+          ...params,
+          search: filters.search || undefined,
+          role: filters.role || undefined,
+          is_active: filters.is_active || undefined,
+        }),
+      deleteData: (id) => usersService.deleteUser(id),
+      dataKey: null,
+      confirmDeleteMsg: "Bạn có chắc muốn xóa người dùng này?",
+    });
 
-    getActiveLabel(is_active) {
-      return is_active ? "Kích hoạt" : "Vô hiệu hóa";
-    },
+    const headers = {
+      name: "Tên",
+      email: "Email",
+      role: "Vai trò",
+      is_active: "Trạng thái",
+    };
 
-    async handleEdit(user) {
+    const { form, showModal, modalMode, openCreate, openEdit, closeModal } =
+      useForm({
+        initialForm: {
+          id: null,
+          name: "",
+          email: "",
+          role: "",
+          is_active: 1,
+        },
+      });
+
+    const handleSearch = (data) => {
+      filters.search = data;
+      loadData();
+    };
+
+    const viewDetail = async (user) => {
       try {
         const res = await usersService.getUserById(user.id);
-        this.selectedUser = res.data.data || res.data;
-        this.showEditModal = true;
+        selectedUser.value = res.data.data || res.data;
+        showDetailModal.value = true;
       } catch {
-        this.toast.error("Không thể tải dữ liệu người dùng");
+        toast.error("Không thể tải chi tiết người dùng");
       }
-    },
+    };
 
-    async handleUpdateUser(userData) {
-      this.isSubmitting = true;
-      try {
-        await usersService.updateUser(userData.id, userData);
-        this.toast.success("Cập nhật thành công!");
-        this.showEditModal = false;
-        await this.loadUsers();
-      } catch {
-        this.toast.error("Không thể cập nhật!");
-      } finally {
-        this.isSubmitting = false;
-      }
-    },
+    const handleDelete = (user) => {
+      deleteItem(user.id);
+    };
 
-    async viewDetail(user) {
-      try {
-        const res = await usersService.getUserById(user.id);
-        this.selectedUser = res.data.data || res.data;
-        this.showDetailModal = true;
-      } catch {
-        this.toast.error("Không thể tải chi tiết người dùng");
-      }
-    },
+    onMounted(() => {
+      loadData();
+    });
 
-    async handleDelete(user) {
-      if (!confirm(`Bạn có chắc muốn xóa ${user.name}?`)) return;
-      try {
-        await usersService.deleteUser(user.id);
-        this.toast.success("Đã xóa thành công");
-        await this.loadUsers();
-      } catch {
-        this.toast.error("Không thể xóa người dùng");
-      }
-    },
-
-    closeModals() {
-      this.showAddModal = false;
-      this.showEditModal = false;
-      this.showDetailModal = false;
-      this.serverErrors = {};
-      this.selectedUser = null;
-    },
+    return {
+      filters,
+      resetFilters,
+      statusActive,
+      getRoleLabel,
+      users,
+      isLoading,
+      pagination,
+      loadData,
+      handleDelete,
+      headers,
+      form,
+      showModal,
+      modalMode,
+      openCreate,
+      openEdit,
+      closeModal,
+      handleSearch,
+      viewDetail,
+      selectedUser,
+      showDetailModal,
+    };
   },
 };
 </script>

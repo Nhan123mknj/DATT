@@ -50,7 +50,7 @@ class ExpensiveBorrowStrategy extends AbstractBorrowStrategy
             'message' => 'Yêu cầu mượn đang chờ duyệt. Vui lòng nộp cam kết trách nhiệm.',
             'deposit_required' => false,
             'commitment_required' => true
-        ];
+        ]; 
     }
 
     public function handleReturn(array $data): array
@@ -100,11 +100,5 @@ class ExpensiveBorrowStrategy extends AbstractBorrowStrategy
             'passed' => true,
             'fee' => 0
         ];
-    }
-
-    public function calculateDeposit(array $data): float
-    {
-        // Không yêu cầu đặt cọc với thiết bị đắt tiền trong trường học
-        return 0;
     }
 }

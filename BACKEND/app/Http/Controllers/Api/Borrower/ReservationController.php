@@ -99,4 +99,27 @@ class ReservationController extends Controller
             ], 404);
         }
     }
+    public function cancel(string $id)
+    {
+        try {
+            $reservation = DeviceReservation::findOrFail($id);
+
+            if (auth('api')->user()->role === 'borrower' && $reservation->user_id !== auth('api')->id()) {
+                return response()->json([
+                    'message' => 'Không có quyền hủy đặt trước này.'
+                ], 403);
+            }
+
+            $reservation = $this->reservationService->cancelReservation($id);
+
+            return response()->json([
+                'message' => 'Đặt trước đã được hủy.',
+                'reservation' => $reservation
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Đặt trước không tồn tại.'
+            ], 404);
+        }
+    }
 }

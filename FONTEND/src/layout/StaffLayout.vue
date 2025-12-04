@@ -6,7 +6,7 @@
         <div class="flex justify-between h-16">
           <!-- Logo and Navigation Links -->
           <div class="flex">
-            <div class="flex-shrink-0 flex items-center">
+            <div class="shrink-0 flex items-center">
               <h1 class="text-xl font-bold text-gray-800">Staff Portal</h1>
             </div>
             <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
@@ -17,7 +17,6 @@
               >
                 Dashboard
               </RouterLink>
-              <!-- Add more navigation links as needed -->
             </div>
           </div>
 
@@ -25,12 +24,12 @@
             <div class="ml-3 relative">
               <div class="flex items-center space-x-4">
                 <img
-                  v-if="user?.avatar_url"
-                  :src="user.avatar_url"
+                  v-if="currentUser?.avatar_url"
+                  :src="currentUser.avatar_url"
                   alt="User Avatar"
                   class="h-8 w-8 rounded-full object-cover"
                 />
-                <span class="text-gray-700">{{ user?.name }}</span>
+                <span class="text-gray-700">{{ currentUser?.name }}</span>
                 <button
                   @click="handleLogout"
                   class="text-gray-700 hover:text-gray-900 font-medium"
@@ -55,20 +54,17 @@
 
 <script>
 import { RouterLink } from "vue-router";
-import authService from "../services/auth/authService";
-
+import { computed } from "vue";
+import authService, { user } from "../services/auth/authService";
 export default {
   name: "StaffLayout",
   components: {
     RouterLink,
   },
-  data() {
-    return {
-      user: null,
-    };
-  },
-  created() {
-    this.user = authService.getUser();
+  computed: {
+    currentUser() {
+      return user.value;
+    },
   },
   methods: {
     async handleLogout() {

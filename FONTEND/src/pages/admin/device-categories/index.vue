@@ -9,9 +9,10 @@
           Quản lý nhóm thiết bị để phân loại và thống kê.
         </p>
       </div>
-      <Button color="primary" @click="goToCreate">
-        <font-awesome-icon icon="plus" class="mr-2" />
-        Thêm danh mục
+      <Button label="Thêm danh mục" @click="openCreate">
+        <template #icon>
+          <font-awesome-icon icon="plus" class="mr-2" />
+        </template>
       </Button>
     </div>
 
@@ -21,12 +22,7 @@
       <div
         class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between"
       >
-        <input
-          v-model="filters.search"
-          type="text"
-          class="w-full sm:max-w-md px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-          placeholder="Tìm kiếm theo tên hoặc mã..."
-        />
+        <SearchBar v-on:handleSearch="handleSearch" />
         <div class="flex gap-2">
           <button
             class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -36,7 +32,7 @@
           </button>
           <button
             class="px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-700"
-            @click="loadCategories()"
+            @click="loadData()"
           >
             Tìm kiếm
           </button>
@@ -70,13 +66,13 @@
             <div class="flex gap-2">
               <button
                 class="px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm"
-                @click="openEditModal(item)"
+                @click="openEdit(item)"
               >
                 Sửa
               </button>
               <button
                 class="px-3 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm"
-                @click="deleteCategory(item)"
+                @click="deleteItem(item.id)"
               >
                 Xóa
               </button>
@@ -86,11 +82,10 @@
         <Pagination
           v-if="pagination.total > pagination.per_page"
           :links="pagination.links"
-          @page-changed="loadCategories"
+          @page-changed="loadData"
         />
       </div>
     </div>
-
     <Modal :show="showModal" :title="modalTitle" @close="closeModal">
       <form class="space-y-4" @submit.prevent="saveCategory">
         <div>
@@ -159,103 +154,123 @@
   </div>
 </template>
 
-<script setup>
-import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
-import { useToast } from "vue-toastification";
-import Table from "../../../components/Table.vue";
-import Button from "../../../components/Button.vue";
-import LoadingSkeleton from "../../../components/LoadingSkeleton.vue";
-import Pagination from "../../../components/Pagination.vue";
+<script>
+import { reactive, computed, onMounted } from "vue";
+import Table from "../../../components/common/Table.vue";
+import Button from "../../../components/common/Button.vue";
+import LoadingSkeleton from "../../../components/common/LoadingSkeleton.vue";
+import Pagination from "../../../components/common/Pagination.vue";
 import Modal from "../../../components/Modal.vue";
+import SearchBar from "../../../components/common/SearchBar.vue";
 import { deviceCategoriesService } from "../../../services/devices/deviceCategoriesService";
+import { useDataTable } from "../../../composables/fetchData/useDataTable";
+import { useForm } from "../../../composables/useForm";
+export default {
+  name: "DeviceCategories",
+  components: {
+    Table,
+    Button,
+    LoadingSkeleton,
+    Pagination,
+    Modal,
+    SearchBar,
+  },
+  setup() {
+    const filters = reactive({
+      search: "",
+    });
 
-const toast = useToast();
-const router = useRouter();
+    const {
+      items: categories,
+      isLoading,
+      pagination,
+      loadData,
+      deleteItem,
+    } = useDataTable({
+      fetchData: (params) =>
+        deviceCategoriesService.list({
+          ...params,
+          search: filters.search || undefined,
+          with_devices: true,
+        }),
+      deleteData: (id) => deviceCategoriesService.remove(id),
+      dataKey: "categories",
+      confirmDeleteMsg: "Bạn chắc chắn muốn xóa danh mục này?",
+    });
 
-const isLoading = ref(false);
-const categories = ref([]);
-const pagination = reactive({
-  current_page: 1,
-  per_page: 10,
-  total: 0,
-  last_page: 1,
-  links: [],
-});
+    const {
+      form,
+      errors,
+      showModal,
+      modalMode,
+      openCreate,
+      openEdit,
+      closeModal,
+      save,
+    } = useForm({
+      createData: (data) => deviceCategoriesService.create(data),
+      updateData: (id, data) => deviceCategoriesService.update(id, data),
+      initialForm: {
+        id: null,
+        name: "",
+        code: "",
+        description: "",
+        is_active: true,
+      },
+    });
 
-const headers = {
-  name: "Tên danh mục",
-  code: "Mã",
-  is_active: "Trạng thái",
-  devices_count: "Số thiết bị",
-};
-
-const filters = reactive({
-  search: "",
-});
-
-const showModal = ref(false);
-const modalMode = ref("create");
-const form = reactive({
-  id: null,
-  name: "",
-  code: "",
-  description: "",
-  is_active: true,
-});
-const errors = reactive({});
-
-const loadCategories = async (page = 1) => {
-  isLoading.value = true;
-  try {
-    const params = {
-      page,
-      search: filters.search || undefined,
-      with_devices: true,
+    const headers = {
+      name: "Tên danh mục",
+      code: "Mã",
+      is_active: "Trạng thái",
+      devices_count: "Số thiết bị",
     };
-    const { data } = await deviceCategoriesService.list(params);
-    const payload = data.categories;
-    categories.value = payload?.data || [];
-    pagination.current_page = payload?.current_page || 1;
-    pagination.per_page = payload?.per_page || 10;
-    pagination.total = payload?.total || 0;
-    pagination.last_page = payload?.last_page || 1;
-    pagination.links = payload?.links || [];
-  } catch (error) {
-    if (error.response?.status === 404) {
-      categories.value = [];
-      pagination.total = 0;
-    } else {
-      toast.error("Không thể tải danh mục");
-    }
-  } finally {
-    isLoading.value = false;
-  }
-};
 
-const goToCreate = () => {
-  router.push({ name: "admin.deviceCategories.create" });
-};
+    const modalTitle = computed(() =>
+      modalMode.value === "create"
+        ? "Thêm danh mục thiết bị"
+        : "Cập nhật danh mục thiết bị"
+    );
 
-const deleteCategory = async (item) => {
-  if (!confirm(`Bạn chắc chắn muốn xóa danh mục "${item.name}"?`)) {
-    return;
-  }
-  try {
-    await deviceCategoriesService.remove(item.id);
-    toast.success("Đã xóa danh mục");
-    loadCategories(pagination.current_page);
-  } catch (error) {
-    toast.error(error.response?.data?.error || "Không thể xóa danh mục");
-  }
-};
+    const handleSearch = (data) => {
+      filters.search = data;
+      loadData();
+    };
 
-const resetFilters = () => {
-  filters.search = "";
-  loadCategories();
-};
+    const resetFilters = () => {
+      filters.search = "";
+      loadData();
+    };
 
-onMounted(() => {
-  loadCategories();
-});
+    const saveCategory = () => {
+      save(() => loadData(pagination.current_page));
+    };
+
+    onMounted(() => {
+      loadData();
+    });
+
+    return {
+      filters,
+      categories,
+      isLoading,
+      pagination,
+      loadData,
+      deleteItem,
+      form,
+      errors,
+      showModal,
+      modalMode,
+      openCreate,
+      openEdit,
+      closeModal,
+      save,
+      headers,
+      modalTitle,
+      handleSearch,
+      resetFilters,
+      saveCategory,
+    };
+  },
+};
 </script>

@@ -34,7 +34,7 @@ const borrower = [
       {
         path: 'account',
         name: 'borrower.account',
-        component: () => import('../pages/account/Account.vue'),
+        component: () => import('../layout/AccountLayout.vue'),
         meta: { title: 'Tài khoản của tôi' },
       },
     ],

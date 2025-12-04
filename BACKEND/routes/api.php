@@ -4,11 +4,11 @@ use App\Http\Controllers\Api\Admin\DeviceCategoriesController;
 use App\Http\Controllers\Api\Admin\DeviceController;
 use App\Http\Controllers\Api\Admin\DeviceUnitsController;
 use App\Http\Controllers\Api\Admin\UserController;
-use App\Http\Controllers\Api\Borrower\BorrowController;
+use App\Http\Controllers\Api\Borrower\BorrowsController;
 use App\Http\Controllers\Api\Staff\BorrowsController as StaffBorrowsController;
 use App\Http\Controllers\Api\Staff\ReservationController as StaffReservationController;
-use App\Http\Controllers\Api\Borrower\DeviceController as BorrowerDeviceController;
-use App\Http\Controllers\Api\MediaController;
+use App\Http\Controllers\Api\Shared\DeviceController as SharedDeviceController;
+use App\Http\Controllers\Api\Shared\MediaController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -67,17 +67,16 @@ Route::middleware(['auth:api'])->group(function () {
 
 Route::prefix('borrower')->middleware(['auth:api', 'role:borrower,admin'])->group(function () {
 
-    // Route::post('borrows', [BorrowController::class, 'store']);
+    // Route::post('borrows', [BorrowsController::class, 'store']);
 
     Route::get('reservations', [ReservationController::class, 'index']);
     Route::post('reservations', [ReservationController::class, 'store']);
     Route::get('reservations/{id}', [ReservationController::class, 'show']);
     Route::post('reservations/{id}/cancel', [ReservationController::class, 'cancel']);
 
-    // Device selection endpoints
-    Route::get('device-categories', [BorrowerDeviceController::class, 'categories']);
-    Route::get('device-categories/{categoryId}/devices', [BorrowerDeviceController::class, 'devicesByCategory']);
-    Route::get('devices/{deviceId}/units', [BorrowerDeviceController::class, 'deviceUnitsByDevice']);
+    Route::get('device-categories', [SharedDeviceController::class, 'categories']);
+    Route::get('device-categories/{id}/devices', [SharedDeviceController::class, 'devicesByCategory']);
+    Route::get('devices/{id}/device-units', [SharedDeviceController::class, 'deviceUnitsByDevice']);
 });
 
 Route::prefix('staff')->middleware(['auth:api', 'role:staff,admin'])->group(function () {
@@ -115,4 +114,9 @@ Route::prefix('media')->middleware(['auth:api'])->group(function () {
     Route::post('/upload', [MediaController::class, 'upload']);
     Route::get('/', [MediaController::class, 'index']);
     Route::delete('/{id}', [MediaController::class, 'destroy']);
+});
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('device-categories', [SharedDeviceController::class, 'categories']);
+    Route::get('device-categories/{id}/devices', [SharedDeviceController::class, 'devicesByCategory']);
+    Route::get('devices/{id}/device-units', [SharedDeviceController::class, 'deviceUnitsByDevice']);
 });

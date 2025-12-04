@@ -22,7 +22,15 @@ class UpdateUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+        ];
+    }
+    public function messages()
+    {
+        return [
+            'name.required' => 'Tên là bắt buộc.',
+            'phone.max' => 'Số điện thoại không được vượt quá 20 ký tự.',
         ];
     }
 }

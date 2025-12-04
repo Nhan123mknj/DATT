@@ -23,7 +23,12 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
-        $filters = $request->only(['name', 'email', 'role', 'is_active', 'from_date', 'to_date']);
+        $filters = $request->only([
+            'name', 'email', 'role', 'is_active',
+            'from_date', 'to_date',
+            'order_by', 'direction',
+            'search'
+        ]);
 
         $perPage = $request->get('per_page', 10);
 

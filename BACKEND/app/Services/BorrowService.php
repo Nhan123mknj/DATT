@@ -18,6 +18,7 @@ class BorrowService extends BaseService
     public function showBorrowingSlip($filters = [], $perPage = 15,)
     {
         $query = Borrows::with([
+            'borrower:id,name,email',
             'details.deviceUnit.device',
         ]);
 
@@ -40,6 +41,8 @@ class BorrowService extends BaseService
                 $userId = $data['borrower_id'] ?? auth('api')->user()->id;
                 $expectedReturn = $data['expected_return_date'];
                 $devices = collect($data['devices']);
+                $fromReservation = $data['from_reservation'] ?? false;
+                $autoApprove = $data['auto_approve'] ?? false;
 
                 if ($devices->isEmpty()) {
                     throw ValidationException::withMessages([
@@ -63,6 +66,13 @@ class BorrowService extends BaseService
                             'devices' => "Thiết bị ID {$unitId} không có thông tin device."
                         ]);
                     }
+
+                    // Check if device is reserved (only for non-reservation borrows)
+                    if (!$fromReservation && $unit->status === 'reserved') {
+                        throw ValidationException::withMessages([
+                            'devices' => "Thiết bị '{$unit->device->name}' (Unit #{$unitId}) đang được đặt trước cho người khác. Không thể tạo phiếu mượn."
+                        ]);
+                    }
                 }
 
                 // $this->checkUserBorrowLimit($userId);
@@ -76,16 +86,18 @@ class BorrowService extends BaseService
                     ]);
                 }
 
+                // Auto-approve if from approved reservation, otherwise pending
+                $initialStatus = $autoApprove ? 'approved' : 'pending';
+
                 $borrow = Borrows::create([
                     'borrower_id' => $userId,
                     'expected_return_date' => $expectedReturn,
-                    'status' => 'pending',
+                    'status' => $initialStatus,
                     'notes' => $data['notes'] ?? null,
-                    // 'borrowed_date' => today(),
                     'commitment_file' => $data['commitment_file'] ?? null,
                 ]);
 
-                $devices->each(function ($deviceData) use ($borrow, $deviceUnits, $expectedReturn, $userId) {
+                $devices->each(function ($deviceData) use ($borrow, $deviceUnits, $expectedReturn, $userId, $fromReservation) {
                     $deviceUnitId = $deviceData['device_unit_id'];
                     $deviceUnit = $deviceUnits[$deviceUnitId];
 
@@ -95,21 +107,30 @@ class BorrowService extends BaseService
 
                     $strategy = BorrowStrategyFactory::createStrategy($deviceUnit->device);
 
-                    $strategy->validateBorrow([
-                        'device_id' => $deviceUnit->device_id,
-                        'device_unit_id' => $deviceUnitId,
-                        'quantity' => 1,
-                        'duration' => $duration,
-                        'user_id' => $userId,
-                    ]);
+                    // If from reservation, skip validation and processing (already done)
+                    if (!$fromReservation) {
+                        $strategy->validateBorrow([
+                            'device_id' => $deviceUnit->device_id,
+                            'device_unit_id' => $deviceUnitId,
+                            'quantity' => 1,
+                            'duration' => $duration,
+                            'user_id' => $userId,
+                        ]);
 
-                    $result = $strategy->processBorrow([
-                        'device_id' => $deviceUnit->device_id,
-                        'device_unit_id' => $deviceUnitId,
-                        'quantity' => 1,
-                        'duration' => $duration,
-                        'user_id' => $userId,
-                    ]);
+                        $result = $strategy->processBorrow([
+                            'device_id' => $deviceUnit->device_id,
+                            'device_unit_id' => $deviceUnitId,
+                            'quantity' => 1,
+                            'duration' => $duration,
+                            'user_id' => $userId,
+                        ]);
+                    } else {
+                        // From reservation: device already reserved, just use default values
+                        $result = [
+                            'status' => 'pending',
+                            'deposit_amount' => 0
+                        ];
+                    }
 
                     BorrowsDetail::create([
                         'borrow_id' => $borrow->id,
@@ -274,5 +295,12 @@ class BorrowService extends BaseService
 
             return $borrow->load('details.deviceUnit');
         });
+    }
+    public function rejectBorrowRequest(string $id)
+    {
+        $borrow = Borrows::findOrFail($id);
+        $borrow->status = 'rejected';
+        $borrow->save();
+        return $borrow;
     }
 }

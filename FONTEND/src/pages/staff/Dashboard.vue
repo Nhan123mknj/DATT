@@ -99,100 +99,107 @@
   </div>
 </template>
 
-<script setup>
-import { onMounted, ref } from "vue";
+<script>
 import { RouterLink } from "vue-router";
 import { useToast } from "vue-toastification";
-import StatCard from "../../components/StatCard.vue";
+import StatCard from "../../components/common/StatCard.vue";
 import { reservationsService } from "../../services/reservations/reservationsService";
 
-const toast = useToast();
-
-const stats = ref({
-  pending: 0,
-  approved: 0,
-  rejected: 0,
-});
-
-const todayCount = ref(0);
-const recentReservations = ref([]);
-const recentLoading = ref(false);
-
-const formatDate = (value) => {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("vi-VN");
-};
-
-const statusLabel = (status) => {
-  const map = {
-    pending: "Chờ duyệt",
-    approved: "Đã duyệt",
-    rejected: "Từ chối",
-    completed: "Hoàn thành",
-    cancelled: "Đã hủy",
-  };
-  return map[status] || status;
-};
-
-const statusClasses = (status) => {
-  switch (status) {
-    case "approved":
-      return "bg-green-100 text-green-700";
-    case "pending":
-      return "bg-amber-100 text-amber-700";
-    case "rejected":
-      return "bg-red-100 text-red-600";
-    default:
-      return "bg-gray-100 text-gray-600";
-  }
-};
-
-const fetchStats = async () => {
-  try {
-    const statuses = ["pending", "approved", "rejected"];
-    const responses = await Promise.allSettled(
-      statuses.map((status) =>
-        reservationsService.listStaff({ status: [status], per_page: 1 })
-      )
-    );
-
-    responses.forEach((res, index) => {
-      if (res.status === "fulfilled") {
-        const payload = res.value.data.data;
-        stats.value[statuses[index]] = payload?.total || 0;
+export default {
+  name: "StaffDashboard",
+  components: {
+    StatCard,
+    RouterLink,
+  },
+  setup() {
+    const toast = useToast();
+    return { toast };
+  },
+  data() {
+    return {
+      stats: {
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+      },
+      todayCount: 0,
+      recentReservations: [],
+      recentLoading: false,
+    };
+  },
+  mounted() {
+    this.fetchStats();
+    this.fetchRecentReservations();
+  },
+  methods: {
+    formatDate(value) {
+      if (!value) return "—";
+      return new Date(value).toLocaleDateString("vi-VN");
+    },
+    statusLabel(status) {
+      const map = {
+        pending: "Chờ duyệt",
+        approved: "Đã duyệt",
+        rejected: "Từ chối",
+        completed: "Hoàn thành",
+        cancelled: "Đã hủy",
+      };
+      return map[status] || status;
+    },
+    statusClasses(status) {
+      switch (status) {
+        case "approved":
+          return "bg-green-100 text-green-700";
+        case "pending":
+          return "bg-amber-100 text-amber-700";
+        case "rejected":
+          return "bg-red-100 text-red-600";
+        default:
+          return "bg-gray-100 text-gray-600";
       }
-    });
+    },
+    async fetchStats() {
+      try {
+        const statuses = ["pending", "approved", "rejected"];
+        const responses = await Promise.allSettled(
+          statuses.map((status) =>
+            reservationsService.listStaff({ status: [status], per_page: 1 })
+          )
+        );
 
-    const today = new Date().toISOString().split("T")[0];
-    const { data } = await reservationsService.listStaff({
-      from_date: today,
-      to_date: today,
-      per_page: 1,
-    });
-    todayCount.value = data.data?.total || 0;
-  } catch (error) {
-    toast.error("Không thể tải thống kê");
-  }
+        responses.forEach((res, index) => {
+          if (res.status === "fulfilled") {
+            const payload = res.value.data.data;
+            this.stats[statuses[index]] = payload?.total || 0;
+          }
+        });
+
+        const today = new Date().toISOString().split("T")[0];
+        const { data } = await reservationsService.listStaff({
+          from_date: today,
+          to_date: today,
+          per_page: 1,
+        });
+        this.todayCount = data.data?.total || 0;
+      } catch (error) {
+        this.toast.error("Không thể tải thống kê");
+      }
+    },
+    async fetchRecentReservations() {
+      this.recentLoading = true;
+      try {
+        const { data } = await reservationsService.listStaff({ per_page: 5 });
+        this.recentReservations = data.data?.data || [];
+      } catch (error) {
+        if (error.response?.status === 404) {
+          this.recentReservations = [];
+        } else {
+          this.toast.error("Không thể tải dữ liệu gần đây");
+        }
+      } finally {
+        this.recentLoading = false;
+      }
+    },
+  },
 };
-
-const fetchRecentReservations = async () => {
-  recentLoading.value = true;
-  try {
-    const { data } = await reservationsService.listStaff({ per_page: 5 });
-    recentReservations.value = data.data?.data || [];
-  } catch (error) {
-    if (error.response?.status === 404) {
-      recentReservations.value = [];
-    } else {
-      toast.error("Không thể tải dữ liệu gần đây");
-    }
-  } finally {
-    recentLoading.value = false;
-  }
-};
-
-onMounted(() => {
-  fetchStats();
-  fetchRecentReservations();
-});
 </script>

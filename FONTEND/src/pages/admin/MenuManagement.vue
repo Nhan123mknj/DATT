@@ -95,13 +95,14 @@
     </div>
 
     <!-- Menu Form Modal -->
-    <Modal
+    <ModalForm
       :show="showMenuModal"
       :title="editingMenu ? 'Chỉnh sửa Menu' : 'Tạo Menu Mới'"
       @close="closeMenuModal"
+      @submit="saveMenu"
       size="medium"
     >
-      <form class="space-y-4" @submit.prevent="saveMenu">
+      <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">
             Tên Menu <span class="text-red-500">*</span>
@@ -153,9 +154,7 @@
           />
           <label class="ml-2 text-sm text-gray-700">Kích hoạt menu</label>
         </div>
-
-        <button type="submit" class="hidden"></button>
-      </form>
+      </div>
 
       <template #footer>
         <div class="flex gap-3">
@@ -167,7 +166,7 @@
             Hủy
           </button>
           <button
-            @click="saveMenu"
+            type="submit"
             class="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-medium disabled:opacity-50"
             :disabled="saving"
           >
@@ -175,10 +174,10 @@
           </button>
         </div>
       </template>
-    </Modal>
+    </ModalForm>
 
     <!-- Menu Items Modal -->
-    <Modal
+    <ModalForm
       :show="showItemsModal"
       :title="`Items: ${currentMenu?.name}`"
       @close="closeItemsModal"
@@ -221,16 +220,17 @@
           Đóng
         </button>
       </template>
-    </Modal>
+    </ModalForm>
 
     <!-- Item Form Modal -->
-    <Modal
+    <ModalForm
       :show="showItemModal"
       :title="editingItem ? 'Sửa Item' : 'Thêm Item Mới'"
       @close="closeItemModal"
+      @submit="saveItem"
       size="medium"
     >
-      <form class="space-y-4" @submit.prevent="saveItem">
+      <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">
             Tên Item <span class="text-red-500">*</span>
@@ -307,9 +307,7 @@
           />
           <label class="ml-2 text-sm text-gray-700">Kích hoạt item</label>
         </div>
-
-        <button type="submit" class="hidden"></button>
-      </form>
+      </div>
 
       <template #footer>
         <div class="flex gap-3">
@@ -321,7 +319,7 @@
             Hủy
           </button>
           <button
-            @click="saveItem"
+            type="submit"
             class="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-medium disabled:opacity-50"
             :disabled="saving"
           >
@@ -329,218 +327,214 @@
           </button>
         </div>
       </template>
-    </Modal>
+    </ModalForm>
   </div>
 </template>
 
-<script setup>
-import { onMounted, ref, reactive, computed } from "vue";
+<script>
 import { useToast } from "vue-toastification";
-import Modal from "../../components/Modal.vue";
+import ModalForm from "../../components/ModalForm.vue";
 import MenuItem from "./MenuItemRow.vue";
-import { menuService } from "../../services/menus/menuService";
+import { menuService } from "../../services/admin/menuService";
 
-const toast = useToast();
+export default {
+  name: "MenuManagement",
+  components: {
+    ModalForm,
+    MenuItem,
+  },
+  data() {
+    return {
+      menus: [],
+      currentMenu: null,
+      currentMenuItems: [],
+      editingMenu: null,
+      editingItem: null,
+      loading: false,
+      saving: false,
+      showMenuModal: false,
+      showItemsModal: false,
+      showItemModal: false,
+      menuForm: {
+        name: "",
+        slug: "",
+        description: "",
+        is_active: true,
+        sort_order: 0,
+      },
+      itemForm: {
+        label: "",
+        url: "",
+        icon: "",
+        badge: "",
+        badge_color: "primary",
+        sort_order: 0,
+        is_active: true,
+        parent_id: null,
+        description: "",
+      },
+      errors: {},
+    };
+  },
+  computed: {
+    rootItems() {
+      return this.currentMenuItems.filter((item) => !item.parent_id);
+    },
+  },
+  mounted() {
+    this.loadMenus();
+  },
+  methods: {
+    async loadMenus() {
+      this.loading = true;
+      try {
+        const { data } = await menuService.list();
+        this.menus = data.data || [];
+      } catch (error) {
+        this.toast.error("Lỗi tải menu");
+      } finally {
+        this.loading = false;
+      }
+    },
+    openCreateMenu() {
+      this.editingMenu = null;
+      Object.assign(this.menuForm, {
+        name: "",
+        slug: "",
+        description: "",
+        is_active: true,
+        sort_order: 0,
+      });
+      this.errors = {};
+      this.showMenuModal = true;
+    },
+    editMenu(menu) {
+      this.editingMenu = menu;
+      Object.assign(this.menuForm, menu);
+      this.errors = {};
+      this.showMenuModal = true;
+    },
+    closeMenuModal() {
+      this.showMenuModal = false;
+      this.editingMenu = null;
+    },
+    async saveMenu() {
+      this.saving = true;
+      this.errors = {};
 
-const menus = ref([]);
-const currentMenu = ref(null);
-const currentMenuItems = ref([]);
-const editingMenu = ref(null);
-const editingItem = ref(null);
-const loading = ref(false);
-const saving = ref(false);
+      try {
+        if (this.editingMenu) {
+          await menuService.update(this.editingMenu.id, this.menuForm);
+          this.toast.success("Cập nhật menu thành công");
+        } else {
+          await menuService.create(this.menuForm);
+          this.toast.success("Tạo menu thành công");
+        }
+        this.loadMenus();
+        this.closeMenuModal();
+      } catch (error) {
+        if (error.response?.data?.errors) {
+          this.errors = error.response.data.errors;
+        } else {
+          this.toast.error("Lỗi lưu menu");
+        }
+      } finally {
+        this.saving = false;
+      }
+    },
+    async deleteMenuConfirm(menu) {
+      if (!confirm(`Xóa menu "${menu.name}"?`)) return;
+      try {
+        await menuService.delete(menu.id);
+        this.toast.success("Xóa menu thành công");
+        this.loadMenus();
+      } catch {
+        this.toast.error("Lỗi xóa menu");
+      }
+    },
+    async manageItems(menu) {
+      this.currentMenu = menu;
+      try {
+        const { data } = await menuService.get(menu.id);
+        this.currentMenuItems = data.data.items || [];
+      } catch {
+        this.toast.error("Lỗi tải items");
+      }
+      this.showItemsModal = true;
+    },
+    closeItemsModal() {
+      this.showItemsModal = false;
+      this.currentMenu = null;
+      this.currentMenuItems = [];
+    },
+    openCreateItem() {
+      this.editingItem = null;
+      Object.assign(this.itemForm, {
+        menu_id: this.currentMenu.id,
+        label: "",
+        url: "",
+        icon: "",
+        badge: "",
+        badge_color: "primary",
+        sort_order: 0,
+        is_active: true,
+        parent_id: null,
+        description: "",
+      });
+      this.errors = {};
+      this.showItemModal = true;
+    },
+    editItem(item) {
+      this.editingItem = item;
+      Object.assign(this.itemForm, {
+        ...item,
+        menu_id: this.currentMenu.id,
+      });
+      this.errors = {};
+      this.showItemModal = true;
+    },
+    closeItemModal() {
+      this.showItemModal = false;
+      this.editingItem = null;
+    },
+    async saveItem() {
+      this.saving = true;
+      this.errors = {};
 
-const showMenuModal = ref(false);
-const showItemsModal = ref(false);
-const showItemModal = ref(false);
-
-const menuForm = reactive({
-  name: "",
-  slug: "",
-  description: "",
-  is_active: true,
-  sort_order: 0,
-});
-
-const itemForm = reactive({
-  label: "",
-  url: "",
-  icon: "",
-  badge: "",
-  badge_color: "primary",
-  sort_order: 0,
-  is_active: true,
-  parent_id: null,
-  description: "",
-});
-
-const errors = reactive({});
-
-const rootItems = computed(() => {
-  return currentMenuItems.value.filter((item) => !item.parent_id);
-});
-
-// Methods
-const loadMenus = async () => {
-  loading.value = true;
-  try {
-    const { data } = await menuService.list();
-    menus.value = data.data || [];
-  } catch (error) {
-    toast.error("Lỗi tải menu");
-  } finally {
-    loading.value = false;
-  }
+      try {
+        if (this.editingItem) {
+          await menuService.updateItem(this.editingItem.id, this.itemForm);
+          this.toast.success("Cập nhật item thành công");
+        } else {
+          await menuService.createItem(this.itemForm);
+          this.toast.success("Tạo item thành công");
+        }
+        this.manageItems(this.currentMenu);
+        this.closeItemModal();
+      } catch (error) {
+        if (error.response?.data?.errors) {
+          this.errors = error.response.data.errors;
+        } else {
+          this.toast.error("Lỗi lưu item");
+        }
+      } finally {
+        this.saving = false;
+      }
+    },
+    async deleteItemConfirm(item) {
+      if (!confirm(`Xóa item "${item.label}"?`)) return;
+      try {
+        await menuService.deleteItem(item.id);
+        this.toast.success("Xóa item thành công");
+        this.manageItems(this.currentMenu);
+      } catch {
+        this.toast.error("Lỗi xóa item");
+      }
+    },
+  },
+  setup() {
+    const toast = useToast();
+    return { toast };
+  },
 };
-
-const openCreateMenu = () => {
-  editingMenu.value = null;
-  Object.assign(menuForm, {
-    name: "",
-    slug: "",
-    description: "",
-    is_active: true,
-    sort_order: 0,
-  });
-  Object.keys(errors).forEach((key) => delete errors[key]);
-  showMenuModal.value = true;
-};
-
-const editMenu = (menu) => {
-  editingMenu.value = menu;
-  Object.assign(menuForm, menu);
-  Object.keys(errors).forEach((key) => delete errors[key]);
-  showMenuModal.value = true;
-};
-
-const closeMenuModal = () => {
-  showMenuModal.value = false;
-  editingMenu.value = null;
-};
-
-const saveMenu = async () => {
-  saving.value = true;
-  Object.keys(errors).forEach((key) => delete errors[key]);
-
-  try {
-    if (editingMenu.value) {
-      await menuService.update(editingMenu.value.id, menuForm);
-      toast.success("Cập nhật menu thành công");
-    } else {
-      await menuService.create(menuForm);
-      toast.success("Tạo menu thành công");
-    }
-    loadMenus();
-    closeMenuModal();
-  } catch (error) {
-    if (error.response?.data?.errors) {
-      Object.assign(errors, error.response.data.errors);
-    } else {
-      toast.error("Lỗi lưu menu");
-    }
-  } finally {
-    saving.value = false;
-  }
-};
-
-const deleteMenuConfirm = async (menu) => {
-  if (!confirm(`Xóa menu "${menu.name}"?`)) return;
-  try {
-    await menuService.delete(menu.id);
-    toast.success("Xóa menu thành công");
-    loadMenus();
-  } catch {
-    toast.error("Lỗi xóa menu");
-  }
-};
-
-const manageItems = async (menu) => {
-  currentMenu.value = menu;
-  try {
-    const { data } = await menuService.get(menu.id);
-    currentMenuItems.value = data.data.items || [];
-  } catch {
-    toast.error("Lỗi tải items");
-  }
-  showItemsModal.value = true;
-};
-
-const closeItemsModal = () => {
-  showItemsModal.value = false;
-  currentMenu.value = null;
-  currentMenuItems.value = [];
-};
-
-const openCreateItem = () => {
-  editingItem.value = null;
-  Object.assign(itemForm, {
-    menu_id: currentMenu.value.id,
-    label: "",
-    url: "",
-    icon: "",
-    badge: "",
-    badge_color: "primary",
-    sort_order: 0,
-    is_active: true,
-    parent_id: null,
-    description: "",
-  });
-  Object.keys(errors).forEach((key) => delete errors[key]);
-  showItemModal.value = true;
-};
-
-const editItem = (item) => {
-  editingItem.value = item;
-  Object.assign(itemForm, {
-    ...item,
-    menu_id: currentMenu.value.id,
-  });
-  Object.keys(errors).forEach((key) => delete errors[key]);
-  showItemModal.value = true;
-};
-
-const closeItemModal = () => {
-  showItemModal.value = false;
-  editingItem.value = null;
-};
-
-const saveItem = async () => {
-  saving.value = true;
-  Object.keys(errors).forEach((key) => delete errors[key]);
-
-  try {
-    if (editingItem.value) {
-      await menuService.updateItem(editingItem.value.id, itemForm);
-      toast.success("Cập nhật item thành công");
-    } else {
-      await menuService.createItem(itemForm);
-      toast.success("Tạo item thành công");
-    }
-    manageItems(currentMenu.value);
-    closeItemModal();
-  } catch (error) {
-    if (error.response?.data?.errors) {
-      Object.assign(errors, error.response.data.errors);
-    } else {
-      toast.error("Lỗi lưu item");
-    }
-  } finally {
-    saving.value = false;
-  }
-};
-
-const deleteItemConfirm = async (item) => {
-  if (!confirm(`Xóa item "${item.label}"?`)) return;
-  try {
-    await menuService.deleteItem(item.id);
-    toast.success("Xóa item thành công");
-    manageItems(currentMenu.value);
-  } catch {
-    toast.error("Lỗi xóa item");
-  }
-};
-
-onMounted(() => {
-  loadMenus();
-});
 </script>

@@ -75,4 +75,49 @@
     </form>
   </div>
 </template>
-<script setup></script>
+<script>
+import { deviceCategoriesService } from "../../../services/devices/deviceCategoriesService";
+import { useToast } from "vue-toastification";
+import { useRouter } from "vue-router";
+
+export default {
+  name: "AddDeviceCategory",
+  data() {
+    return {
+      isSubmitting: false,
+      form: {
+        name: "",
+        description: "",
+        is_active: true,
+      },
+    };
+  },
+  methods: {
+    goBack() {
+      this.router.push({ name: "admin.deviceCategories" });
+    },
+    async handleSubmit() {
+      if (!this.form.name) {
+        this.toast.error("Vui lòng nhập tên danh mục");
+        return;
+      }
+
+      this.isSubmitting = true;
+      try {
+        await deviceCategoriesService.create(this.form);
+        this.toast.success("Thêm danh mục thành công");
+        this.goBack();
+      } catch (error) {
+        this.toast.error(error.response?.data?.message || "Có lỗi xảy ra");
+      } finally {
+        this.isSubmitting = false;
+      }
+    },
+  },
+  setup() {
+    const toast = useToast();
+    const router = useRouter();
+    return { toast, router };
+  },
+};
+</script>

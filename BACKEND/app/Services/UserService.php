@@ -9,8 +9,12 @@ class UserService
 {
     public function getAllUser($filters = [], $perPage = 10)
     {
-        $query = User::query()->orderBy('id', 'ASC');
+        $query = User::query();
         $query = (new UserFilter($query, $filters))->apply();
+
+        if (!isset($filters['order_by'])) {
+            $query->orderBy('id', 'ASC');
+        }
 
         return $query->paginate($perPage);
     }

@@ -73,45 +73,54 @@
     </div>
   </div>
 </template>
-<script setup>
-import { ref } from "vue";
+
+<script>
 import { useRouter } from "vue-router";
 import authService from "../services/auth/authService.js";
 
-const router = useRouter();
+export default {
+  name: "Login",
+  data() {
+    return {
+      passwordVisible: false,
+      email: "",
+      password: "",
+      isLoading: false,
+      errorMessage: "",
+    };
+  },
+  methods: {
+    togglePasswordVisibility() {
+      this.passwordVisible = !this.passwordVisible;
+    },
+    async handleLogin() {
+      if (!this.email || !this.password) {
+        this.errorMessage = "Vui lòng nhập đầy đủ thông tin";
+        return;
+      }
 
-const passwordVisible = ref(false);
-const email = ref("");
-const password = ref("");
-const isLoading = ref(false);
-const errorMessage = ref("");
+      this.isLoading = true;
+      this.errorMessage = "";
 
-const togglePasswordVisibility = () => {
-  passwordVisible.value = !passwordVisible.value;
-};
+      try {
+        const result = await authService.login(this.email, this.password);
 
-const handleLogin = async () => {
-  if (!email.value || !password.value) {
-    errorMessage.value = "Vui lòng nhập đầy đủ thông tin";
-    return;
-  }
-
-  isLoading.value = true;
-  errorMessage.value = "";
-
-  try {
-    const result = await authService.login(email.value, password.value);
-
-    if (result.success) {
-      router.push({ name: `${result.role}.dashboard` });
-    } else {
-      errorMessage.value = result.error || "Đăng nhập thất bại";
-    }
-  } catch (error) {
-    errorMessage.value = "Có lỗi xảy ra, vui lòng thử lại";
-    console.error("Login error:", error);
-  } finally {
-    isLoading.value = false;
-  }
+        if (result.success) {
+          this.$router.push({ name: `${result.role}.dashboard` });
+        } else {
+          this.errorMessage = result.error || "Đăng nhập thất bại";
+        }
+      } catch (error) {
+        this.errorMessage = "Có lỗi xảy ra, vui lòng thử lại";
+        console.error("Login error:", error);
+      } finally {
+        this.isLoading = false;
+      }
+    },
+  },
+  setup() {
+    const router = useRouter();
+    return { router };
+  },
 };
 </script>

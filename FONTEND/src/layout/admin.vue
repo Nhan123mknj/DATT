@@ -10,9 +10,15 @@
   </div>
 </template>
 
-<script setup>
-import Header from "../components/Header.vue";
-import SideBar from "../components/SideBar.vue";
-</script>
+<script>
+import Header from "../components/ComponentHeader.vue";
+import SideBar from "../components/common/SideBar.vue";
 
-<style scoped></style>
+export default {
+  name: "AdminLayout",
+  components: {
+    Header,
+    SideBar,
+  },
+};
+</script>

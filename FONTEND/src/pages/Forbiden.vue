@@ -77,36 +77,48 @@
   </div>
 </template>
 
-<script setup>
-import { ref } from "vue";
+<script>
 import { useRouter, useRoute } from "vue-router";
 
-const router = useRouter();
-const route = useRoute();
-const error = ref(route.query.message);
-
-const goBack = () => {
-  router.back();
-};
-
-const goHome = () => {
-  const user = JSON.parse(localStorage.getItem("user"));
-  if (user) {
-    switch (user.role) {
-      case "admin":
-        router.push({ name: "admin.dashboard" });
-        break;
-      case "staff":
-        router.push({ name: "staff.dashboard" });
-        break;
-      case "borrower":
-        router.push({ name: "borrower.dashboard" });
-        break;
-      default:
-        router.push({ name: "login" });
-    }
-  } else {
-    router.push({ name: "login" });
-  }
+export default {
+  name: "Forbiden",
+  data() {
+    return {
+      error: null,
+    };
+  },
+  created() {
+    this.error = this.route.query.message;
+  },
+  methods: {
+    goBack() {
+      this.router.back();
+    },
+    goHome() {
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (user) {
+        switch (user.role) {
+          case "admin":
+            this.router.push({ name: "admin.dashboard" });
+            break;
+          case "staff":
+            this.router.push({ name: "staff.dashboard" });
+            break;
+          case "borrower":
+            this.router.push({ name: "borrower.dashboard" });
+            break;
+          default:
+            this.router.push({ name: "login" });
+        }
+      } else {
+        this.router.push({ name: "login" });
+      }
+    },
+  },
+  setup() {
+    const router = useRouter();
+    const route = useRoute();
+    return { router, route };
+  },
 };
 </script>

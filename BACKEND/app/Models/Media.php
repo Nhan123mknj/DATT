@@ -2,76 +2,55 @@
 
 namespace App\Models;
 
+use App\Services\CloudinaryService;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Media extends Model
 {
-    use HasFactory, SoftDeletes;
-
     protected $fillable = [
         'public_id',
         'url',
-        'secure_url',
-        'resource_type',
-        'format',
-        'size',
-        'width',
-        'height',
-        'folder',
         'type',
-        'mime_type',
-        'sort_order',
         'mediable_type',
         'mediable_id',
     ];
 
-    protected $casts = [
-        'size' => 'integer',
-        'width' => 'integer',
-        'height' => 'integer',
-        'sort_order' => 'integer',
+    protected $hidden = [
+        'mediable_type',
+        'mediable_id',
     ];
 
     /**
-     * Get the parent mediable model (User, Device, etc.)
+     * Polymorphic relationship
      */
-    public function mediable()
+    public function mediable(): MorphTo
     {
         return $this->morphTo();
     }
 
     /**
-     * Get the Cloudinary URL with optional transformations.
+     * Get URL với transformation
      */
-    public function getTransformedUrl(array $transformations = []): string
+    public function getUrl(?int $width = null, ?int $height = null): string
     {
-        if (empty($transformations)) {
-            return $this->secure_url ?? $this->url;
+        if (!$width || !$height) {
+            return $this->url;
         }
 
-        return Cloudinary::getUrl($this->public_id, [
-            'transformation' => [$transformations],
-            'resource_type' => $this->resource_type ?? 'image',
-            'format' => $this->format,
-        ]);
+        return app(CloudinaryService ::class)->getUrl($this->public_id, $width, $height);
     }
 
     /**
-     * Scope for filtering by type
+     * Accessor cho thumbnail
      */
-    public function scopeOfType($query, string $type)
+    protected function thumbnail(): \Illuminate\Database\Eloquent\Casts\Attribute
     {
-        return $query->where('type', $type);
-    }
-
-    /**
-     * Scope for filtering by resource type
-     */
-    public function scopeImages($query)
-    {
-        return $query->where('resource_type', 'image');
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: fn() => $this->getUrl(200, 200),
+        );
     }
 }

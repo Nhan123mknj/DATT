@@ -52,7 +52,7 @@ const admin = [
       {
         path: 'account',
         name: 'admin.account',
-        component: () => import('../pages/account/Account.vue'),
+        component: () => import('../layout/AccountLayout.vue'),
         meta: { title: 'Tài khoản của tôi' },
       },
     ],

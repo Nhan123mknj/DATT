@@ -6,6 +6,8 @@ use App\Models\Models\ApprovalQueue;
 use App\Traits\HasMedia;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Tymon\JWTAuth\Contracts\JWTSubject;
@@ -85,17 +87,34 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
     /**
      * Get avatar URL - uses media relationship if available, falls back to legacy avatar field
      */
-    public function getAvatarUrlAttribute(): string
+    public function media(): MorphMany
     {
-        $avatarMedia = $this->getMediaByType('avatar');
-        if ($avatarMedia) {
-            return $avatarMedia->secure_url;
-        }
-        if ($this->avatar) {
-            return $this->avatar;
-        }
+        return $this->morphMany(Media::class, 'mediable')->orderBy('id');
+    }
+    public function avatar(): MorphOne
+    {
+        return $this->morphOne(Media::class, 'mediable')->where('type', 'avatar');
+    }
+    public function gallery(): MorphMany
+    {
+        return $this->media()->where('type', 'gallery');
+    }
 
-        return asset('images/default-avatar.png');
+    public function documents(): MorphMany
+    {
+        return $this->media()->where('type', 'document');
+    }
+
+    protected function avatarUrl(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: fn() => $this->avatar?->url,
+        );
+    }
+
+    public function getAvatarUrl(?int $width = null, ?int $height = null): ?string
+    {
+        return $this->avatar?->getUrl($width, $height);
     }
     public function borrows()
     {

@@ -3,9 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-
+use Illuminate\Database\Eloquent\SoftDeletes;
 class DeviceReservation extends Model
 {
+    use SoftDeletes;
     protected $table = 'device_reservations';
     protected $fillable = [
         'user_id',
@@ -17,7 +18,8 @@ class DeviceReservation extends Model
         'checked_in_at',
         'is_no_show',
         'no_show_notes',
-        'notes'
+        'notes',
+        'deleted_at'
     ];
 
     protected $casts = [

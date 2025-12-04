@@ -6,7 +6,7 @@ namespace App\Services\Borrow\Strategies;
 use App\Models\Devices;
 use App\Models\DeviceUnits;
 use App\Services\Borrow\AbstractBorrowStrategy;
-use League\Config\Exception\ValidationException;
+use Illuminate\Validation\ValidationException;
 
 class ConsumableBorrowStrategy extends AbstractBorrowStrategy
 {
@@ -48,13 +48,28 @@ class ConsumableBorrowStrategy extends AbstractBorrowStrategy
 
     public function processBorrow(array $data): array
     {
-        // Giảm số lượng tồn kho
-        $this->device->decrement('quantity', $data['quantity']);
+
+        $deviceUnitId = $data['device_unit_id'];
+
+        $unit = DeviceUnits::find($deviceUnitId);
+
+        if (!$unit || $unit->status !== 'available') {
+            throw ValidationException::withMessages([
+                'device_unit_id' => "Thiết bị không khả dụng."
+            ]);
+        }
+
+
+        $unit->update([
+            'status' => 'consumed',
+            'notes' => 'Đã được mượn và tiêu thụ'
+        ]);
 
         return [
             'status' => 'approved',
             'message' => 'Mượn thành công',
-            'deposit_required' => false
+            'deposit_required' => false,
+            'deposit_amount' => 0
         ];
     }
 
@@ -73,7 +88,7 @@ class ConsumableBorrowStrategy extends AbstractBorrowStrategy
 
     protected function getMaxBorrowDuration(): int
     {
-        return 0; // Không giới hạn thời gian
+        return 7;
     }
 
     protected function requiresApproval(): bool

@@ -5,7 +5,7 @@ const staff = [
     path: '/staff',
     name: 'Staff',
     component: () => import('../layout/StaffLayout.vue'),
-    beforeEnter: [requireAuth, staffRoleGuard   ],
+    beforeEnter: [requireAuth, staffRoleGuard],
     children: [
       {
         path: '',
@@ -22,13 +22,13 @@ const staff = [
       {
         path: 'borrows',
         name: 'staff.borrows',
-        component: () => import('../pages/borrower/Borrows.vue'),
+        component: () => import('../pages/staff/Borrows.vue'),
         meta: { title: 'Phiếu mượn' },
       },
       {
         path: 'account',
         name: 'staff.account',
-        component: () => import('../pages/account/Account.vue'),
+        component: () => import('../layout/AccountLayout.vue'),
         meta: { title: 'Tài khoản của tôi' },
       },
     ],

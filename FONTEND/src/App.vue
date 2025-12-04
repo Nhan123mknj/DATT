@@ -5,5 +5,3 @@ import AuthLayout from "./layout/AuthLayout.vue";
 <template>
   <router-view></router-view>
 </template>
-
-<style scoped></style>

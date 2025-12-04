@@ -3,14 +3,8 @@ import apiClient from '../api/apiClient'
 const BASE_URL = '/admin/users'
 
 export const usersService = {
-  getAllUser(page = 1, perPage = 10, filters = {}) {
-    return apiClient.get(BASE_URL, {
-      params: {
-        page,
-        per_page: perPage,
-        ...filters,
-      },
-    })
+  getAllUser(params = {}) {
+    return apiClient.get(BASE_URL, { params })
   },
 
   getUserById(id) {

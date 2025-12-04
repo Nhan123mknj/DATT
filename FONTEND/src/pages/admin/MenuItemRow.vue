@@ -59,17 +59,19 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  item: {
-    type: Object,
-    required: true,
+<script>
+export default {
+  name: "MenuItem",
+  props: {
+    item: {
+      type: Object,
+      required: true,
+    },
+    depth: {
+      type: Number,
+      default: 0,
+    },
   },
-  depth: {
-    type: Number,
-    default: 0,
-  },
-});
-
-defineEmits(["edit", "delete"]);
+  emits: ["edit", "delete"],
+};
 </script>

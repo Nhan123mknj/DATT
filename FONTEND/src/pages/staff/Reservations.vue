@@ -83,6 +83,18 @@
               >
                 Tạo phiếu mượn
               </button>
+              <button
+                v-if="
+                  item.status === 'cancelled' ||
+                  item.status === 'rejected' ||
+                  item.status === 'completed'
+                "
+                class="px-3 py-1 rounded-lg border border-red-200 text-red-600 text-sm hover:bg-red-50 transition-colors"
+                @click="deleteReservation(item)"
+                :title="`Xóa reservation (status: ${item.status})`"
+              >
+                Xóa
+              </button>
             </div>
           </template>
         </Table>
@@ -99,42 +111,210 @@
       :show="showDetailModal"
       title="Chi tiết đặt trước"
       @close="closeDetail"
+      size="large"
     >
-      <div v-if="selectedReservation" class="space-y-3 text-sm text-gray-700">
-        <p>
-          <span class="font-semibold">Người mượn:</span>
-          {{ selectedReservation.user?.name }}
-        </p>
-        <p>
-          <span class="font-semibold">Email:</span>
-          {{ selectedReservation.user?.email }}
-        </p>
-        <p>
-          <span class="font-semibold">Thời gian:</span>
-          {{ formatDate(selectedReservation.reserved_from) }} →
-          {{ formatDate(selectedReservation.reserved_until) }}
-        </p>
-        <div>
-          <span class="font-semibold">Thiết bị:</span>
-          <ul class="mt-2 list-disc list-inside space-y-1">
-            <li
-              v-for="detail in selectedReservation.details || []"
-              :key="detail.id"
+      <div v-if="selectedReservation" class="space-y-5 text-sm text-gray-700">
+        <!-- Header Info -->
+        <div
+          class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100"
+        >
+          <div>
+            <p
+              class="text-gray-500 text-xs uppercase tracking-wider font-semibold mb-1"
             >
-              Đơn vị #{{ detail.device_unit_id }} -
-              {{ detail.device_unit?.device?.name }}
-            </li>
-          </ul>
+              Mã yêu cầu
+            </p>
+            <p class="font-bold text-gray-900 text-lg">
+              #{{ selectedReservation.id }}
+            </p>
+          </div>
+          <div class="text-right">
+            <p
+              class="text-gray-500 text-xs uppercase tracking-wider font-semibold mb-1"
+            >
+              Trạng thái
+            </p>
+            <span
+              class="px-3 py-1 rounded-full text-xs font-semibold inline-block"
+              :class="statusClasses(selectedReservation.status)"
+            >
+              {{ statusLabel(selectedReservation.status) }}
+            </span>
+          </div>
         </div>
-        <p>
-          <span class="font-semibold">Ghi chú:</span>
-          {{ selectedReservation.notes || "Không có" }}
-        </p>
+
+        <!-- User Info -->
+        <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+          <h3 class="font-bold text-indigo-900 mb-3 flex items-center">
+            <span
+              class="w-6 h-6 rounded-full bg-indigo-200 text-indigo-700 flex items-center justify-center text-xs mr-2"
+            >
+              <font-awesome-icon icon="user" />
+            </span>
+            Thông tin người mượn
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p class="text-gray-500 text-xs mb-1">Họ tên</p>
+              <p class="font-medium text-gray-900">
+                {{ selectedReservation.user?.name || "N/A" }}
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-500 text-xs mb-1">Email</p>
+              <p class="font-medium text-gray-900">
+                {{ selectedReservation.user?.email || "N/A" }}
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-500 text-xs mb-1">Số điện thoại</p>
+              <p class="font-medium text-gray-900">
+                {{ selectedReservation.user?.phone || "N/A" }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Time Info -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="p-3 border border-gray-100 rounded-lg">
+            <p class="text-gray-500 text-xs mb-1">Từ ngày</p>
+            <p class="font-medium flex items-center gap-2">
+              <font-awesome-icon icon="calendar-alt" class="text-indigo-500" />
+              {{ formatDate(selectedReservation.reserved_from) }}
+            </p>
+          </div>
+          <div class="p-3 border border-gray-100 rounded-lg">
+            <p class="text-gray-500 text-xs mb-1">Đến ngày</p>
+            <p class="font-medium flex items-center gap-2">
+              <font-awesome-icon
+                icon="calendar-check"
+                class="text-indigo-500"
+              />
+              {{ formatDate(selectedReservation.reserved_until) }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Devices List -->
+        <div>
+          <p class="font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <font-awesome-icon icon="boxes" class="text-gray-400" />
+            Danh sách thiết bị
+          </p>
+          <div
+            class="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden"
+          >
+            <ul class="divide-y divide-gray-200">
+              <li
+                v-for="(detail, index) in selectedReservation.details || []"
+                :key="detail.id"
+                class="p-3 hover:bg-white transition-colors flex items-center justify-between"
+              >
+                <div class="flex items-center gap-3">
+                  <span
+                    class="w-6 h-6 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs font-bold"
+                  >
+                    {{ index + 1 }}
+                  </span>
+                  <div>
+                    <span class="font-medium text-gray-900 block">{{
+                      detail.device_unit?.device?.name ||
+                      "Thiết bị không xác định"
+                    }}</span>
+                    <span class="text-xs text-gray-500 font-mono">
+                      Unit #{{ detail.device_unit_id }}
+                      <span
+                        v-if="detail.device_unit?.code"
+                        class="ml-2 bg-gray-200 px-1.5 py-0.5 rounded text-gray-600"
+                        >{{ detail.device_unit.code }}</span
+                      >
+                    </span>
+                  </div>
+                </div>
+              </li>
+            </ul>
+            <div
+              v-if="!selectedReservation.details?.length"
+              class="p-4 text-center text-gray-500 italic"
+            >
+              Không có thiết bị nào
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div
+          v-if="selectedReservation.notes"
+          class="bg-amber-50 border border-amber-100 rounded-xl p-4"
+        >
+          <p class="font-bold text-amber-800 mb-1 flex items-center gap-2">
+            <font-awesome-icon icon="sticky-note" />
+            Ghi chú
+          </p>
+          <p class="text-amber-900">{{ selectedReservation.notes }}</p>
+        </div>
+
+        <!-- Commitment File -->
+        <div
+          v-if="selectedReservation.commitment_file"
+          class="bg-purple-50 border border-purple-100 rounded-xl p-4"
+        >
+          <p class="font-bold text-purple-800 mb-3 flex items-center gap-2">
+            <font-awesome-icon icon="file-contract" />
+            File cam kết
+          </p>
+
+          <div class="space-y-3">
+            <div
+              v-if="isPdfFile(selectedReservation.commitment_file)"
+              class="rounded-lg overflow-hidden border border-purple-200 bg-white"
+            >
+              <iframe
+                :src="selectedReservation.commitment_file"
+                class="w-full h-96"
+              ></iframe>
+            </div>
+            <div
+              v-else-if="isImageFile(selectedReservation.commitment_file)"
+              class="rounded-lg overflow-hidden border border-purple-200 bg-white"
+            >
+              <img
+                :src="selectedReservation.commitment_file"
+                alt="File cam kết"
+                class="w-full max-h-96 object-contain"
+              />
+            </div>
+            <div
+              v-else
+              class="flex items-center gap-3 p-3 bg-white rounded-lg border border-purple-200"
+            >
+              <div
+                class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600"
+              >
+                <font-awesome-icon icon="file-download" class="text-xl" />
+              </div>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-gray-900">Tệp đính kèm</p>
+                <p class="text-xs text-gray-500">
+                  {{ getFileName(selectedReservation.commitment_file) }}
+                </p>
+              </div>
+              <a
+                :href="selectedReservation.commitment_file"
+                target="_blank"
+                class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-700 transition-colors font-medium"
+              >
+                Tải xuống
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
       <template #footer>
         <button
           type="button"
-          class="px-4 py-2 rounded-lg bg-gray-900 text-white"
+          class="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 transition-colors"
           @click="closeDetail"
         >
           Đóng
@@ -143,12 +323,13 @@
     </Modal>
 
     <!-- Reject Modal -->
-    <Modal
+    <ModalForm
       :show="showRejectModal"
       title="Lý do từ chối"
       @close="closeRejectModal"
+      @submit="submitReject"
     >
-      <form class="space-y-3" @submit.prevent="submitReject">
+      <div class="space-y-3">
         <textarea
           v-model="rejectReason"
           rows="4"
@@ -156,34 +337,31 @@
           placeholder="Nhập lý do..."
         ></textarea>
         <p v-if="rejectError" class="text-xs text-red-500">{{ rejectError }}</p>
-        <button type="submit" class="hidden" aria-hidden="true"></button>
-      </form>
+      </div>
       <template #footer>
-        <div class="flex gap-3">
-          <button
-            type="button"
-            class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600"
-            @click="closeRejectModal"
-          >
-            Hủy
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-lg bg-red-600 text-white"
-            @click="submitReject"
-            :disabled="rejectLoading"
-          >
-            {{ rejectLoading ? "Đang xử lý..." : "Từ chối" }}
-          </button>
-        </div>
+        <button
+          type="button"
+          class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600"
+          @click="closeRejectModal"
+        >
+          Hủy
+        </button>
+        <button
+          type="submit"
+          class="px-4 py-2 rounded-lg bg-red-600 text-white"
+          :disabled="rejectLoading"
+        >
+          {{ rejectLoading ? "Đang xử lý..." : "Từ chối" }}
+        </button>
       </template>
-    </Modal>
+    </ModalForm>
 
     <!-- Create Borrow Modal -->
-    <Modal
+    <ModalForm
       :show="showCreateBorrowModal"
       title="Tạo phiếu mượn từ đặt trước"
       @close="closeCreateBorrowModal"
+      @submit="submitCreateBorrow"
       size="large"
     >
       <div v-if="selectedReservationForBorrow" class="space-y-4">
@@ -388,229 +566,252 @@
       </div>
 
       <template #footer>
-        <div class="flex gap-3">
-          <button
-            type="button"
-            class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-            @click="closeCreateBorrowModal"
-          >
-            Hủy
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-            @click="submitCreateBorrow"
-            :disabled="borrowLoading"
-          >
-            {{ borrowLoading ? "Đang tạo..." : "Xác nhận tạo phiếu mượn" }}
-          </button>
-        </div>
+        <button
+          type="button"
+          class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+          @click="closeCreateBorrowModal"
+        >
+          Hủy
+        </button>
+        <button
+          type="submit"
+          class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+          :disabled="borrowLoading"
+        >
+          {{ borrowLoading ? "Đang tạo..." : "Xác nhận tạo phiếu mượn" }}
+        </button>
       </template>
-    </Modal>
+    </ModalForm>
   </div>
 </template>
 
-<script setup>
+<script>
 import { onMounted, reactive, ref } from "vue";
 import { useToast } from "vue-toastification";
-import Table from "../../components/Table.vue";
-import LoadingSkeleton from "../../components/LoadingSkeleton.vue";
-import Pagination from "../../components/Pagination.vue";
+import Table from "../../components/common/Table.vue";
+import LoadingSkeleton from "../../components/common/LoadingSkeleton.vue";
+import Pagination from "../../components/common/Pagination.vue";
 import Modal from "../../components/Modal.vue";
+import ModalForm from "../../components/ModalForm.vue";
 import { reservationsService } from "../../services/reservations/reservationsService";
+import { useDataTable } from "../../composables/fetchData/useDataTable";
+import useStatusLabel from "../../composables/utils/statusLabel";
+import useFormatDate from "../../composables/utils/formatDate";
 
-const toast = useToast();
+export default {
+  name: "StaffReservations",
+  components: {
+    Table,
+    LoadingSkeleton,
+    Pagination,
+    Modal,
+    ModalForm,
+  },
+  setup() {
+    const toast = useToast();
+    const { statusReverseLabel: statusLabel, statusClasses } = useStatusLabel();
+    const { formatDate } = useFormatDate();
 
-const headers = {
-  borrower: "Người mượn",
-  reserved_from: "Từ ngày",
-  reserved_until: "Đến ngày",
-  status: "Trạng thái",
-};
+    const filters = reactive({ status: "" });
 
-const statusMap = {
-  pending: "Chờ duyệt",
-  approved: "Đã duyệt",
-  rejected: "Từ chối",
-  completed: "Hoàn thành",
-  cancelled: "Đã hủy",
-};
-
-const reservations = ref([]);
-const pagination = reactive({
-  current_page: 1,
-  per_page: 10,
-  total: 0,
-  last_page: 1,
-  links: [],
-});
-const filters = reactive({ status: "" });
-const isLoading = ref(false);
-
-const showDetailModal = ref(false);
-const selectedReservation = ref(null);
-
-const showRejectModal = ref(false);
-const rejectTarget = ref(null);
-const rejectReason = ref("");
-const rejectError = ref("");
-const rejectLoading = ref(false);
-
-const showCreateBorrowModal = ref(false);
-const selectedReservationForBorrow = ref(null);
-const borrowLoading = ref(false);
-
-const formatDate = (value) => {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("vi-VN");
-};
-
-const isPdfFile = (filePath) => {
-  return filePath?.toLowerCase().endsWith(".pdf");
-};
-
-const isImageFile = (filePath) => {
-  if (!filePath) return false;
-  const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
-  return imageExtensions.some((ext) => filePath.toLowerCase().endsWith(ext));
-};
-
-const getFileName = (filePath) => {
-  if (!filePath) return "";
-  return filePath.split("/").pop();
-};
-
-const statusLabel = (status) => statusMap[status] || status;
-const statusClasses = (status) => {
-  switch (status) {
-    case "approved":
-      return "bg-green-100 text-green-700";
-    case "pending":
-      return "bg-amber-100 text-amber-700";
-    case "rejected":
-      return "bg-red-100 text-red-600";
-    default:
-      return "bg-gray-100 text-gray-600";
-  }
-};
-
-const loadReservations = async (page = 1) => {
-  isLoading.value = true;
-  try {
-    const params = {
-      page,
-      status: filters.status ? [filters.status] : undefined,
-      per_page: pagination.per_page,
+    const headers = {
+      borrower: "Người mượn",
+      reserved_from: "Từ ngày",
+      reserved_until: "Đến ngày",
+      status: "Trạng thái",
     };
-    const { data } = await reservationsService.listStaff(params);
-    const payload = data.data;
-    reservations.value = payload?.data || [];
-    pagination.current_page = payload?.current_page || 1;
-    pagination.per_page = payload?.per_page || 10;
-    pagination.total = payload?.total || 0;
-    pagination.last_page = payload?.last_page || 1;
-    pagination.links = payload?.links || [];
-  } catch (error) {
-    if (error.response?.status === 404) {
-      reservations.value = [];
-      pagination.total = 0;
-    } else {
-      toast.error("Không thể tải danh sách");
-    }
-  } finally {
-    isLoading.value = false;
-  }
-};
 
-const openDetail = (reservation) => {
-  selectedReservation.value = reservation;
-  showDetailModal.value = true;
-};
+    const statusMap = {
+      pending: "Chờ duyệt",
+      approved: "Đã duyệt",
+      rejected: "Từ chối",
+      completed: "Hoàn thành",
+      cancelled: "Đã hủy",
+    };
 
-const closeDetail = () => {
-  selectedReservation.value = null;
-  showDetailModal.value = false;
-};
-
-const approveReservation = async (reservation) => {
-  if (!confirm("Xác nhận duyệt yêu cầu này?")) return;
-  try {
-    await reservationsService.approve(reservation.id);
-    toast.success("Đã duyệt yêu cầu");
-    loadReservations(pagination.current_page);
-  } catch (error) {
-    toast.error(error.response?.data?.message || "Duyệt thất bại");
-  }
-};
-
-const openRejectModal = (reservation) => {
-  rejectTarget.value = reservation;
-  rejectReason.value = "";
-  rejectError.value = "";
-  showRejectModal.value = true;
-};
-
-const closeRejectModal = () => {
-  showRejectModal.value = false;
-  rejectTarget.value = null;
-};
-
-const submitReject = async () => {
-  if (!rejectReason.value.trim()) {
-    rejectError.value = "Vui lòng nhập lý do";
-    return;
-  }
-  rejectLoading.value = true;
-  rejectError.value = "";
-  try {
-    await reservationsService.reject(rejectTarget.value.id, {
-      reason: rejectReason.value,
+    const {
+      items: reservations,
+      isLoading,
+      pagination,
+      loadData: loadReservations,
+    } = useDataTable({
+      fetchData: (params) =>
+        reservationsService.listStaff({
+          ...params,
+          status: filters.status ? [filters.status] : undefined,
+        }),
+      dataKey: "data",
+      perPage: 10,
     });
-    toast.success("Đã từ chối yêu cầu");
-    closeRejectModal();
-    loadReservations(pagination.current_page);
-  } catch (error) {
-    rejectError.value = error.response?.data?.message || "Không thể từ chối";
-  } finally {
-    rejectLoading.value = false;
-  }
+
+    const showDetailModal = ref(false);
+    const selectedReservation = ref(null);
+    const showRejectModal = ref(false);
+    const rejectTarget = ref(null);
+    const rejectReason = ref("");
+    const rejectError = ref("");
+    const rejectLoading = ref(false);
+    const showCreateBorrowModal = ref(false);
+    const selectedReservationForBorrow = ref(null);
+    const borrowLoading = ref(false);
+
+    const isPdfFile = (filePath) => {
+      return filePath?.toLowerCase().endsWith(".pdf");
+    };
+
+    const isImageFile = (filePath) => {
+      if (!filePath) return false;
+      const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+      return imageExtensions.some((ext) =>
+        filePath.toLowerCase().endsWith(ext)
+      );
+    };
+
+    const getFileName = (filePath) => {
+      if (!filePath) return "";
+      return filePath.split("/").pop();
+    };
+
+    const openDetail = (reservation) => {
+      selectedReservation.value = reservation;
+      showDetailModal.value = true;
+    };
+
+    const closeDetail = () => {
+      selectedReservation.value = null;
+      showDetailModal.value = false;
+    };
+
+    const approveReservation = async (reservation) => {
+      if (!confirm("Xác nhận duyệt yêu cầu này?")) return;
+      try {
+        await reservationsService.approve(reservation.id);
+        toast.success("Đã duyệt yêu cầu");
+        loadReservations(pagination.current_page);
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Duyệt thất bại");
+      }
+    };
+
+    const deleteReservation = async (reservation) => {
+      if (!confirm("Xác nhận xóa yêu cầu này?")) return;
+      try {
+        await reservationsService.delete(reservation.id);
+        toast.success("Đã xóa yêu cầu");
+        loadReservations(pagination.current_page);
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Xóa thất bại");
+      }
+    };
+
+    const openRejectModal = (reservation) => {
+      rejectTarget.value = reservation;
+      rejectReason.value = "";
+      rejectError.value = "";
+      showRejectModal.value = true;
+    };
+
+    const closeRejectModal = () => {
+      showRejectModal.value = false;
+      rejectTarget.value = null;
+    };
+
+    const submitReject = async () => {
+      if (!rejectReason.value.trim()) {
+        rejectError.value = "Vui lòng nhập lý do";
+        return;
+      }
+      rejectLoading.value = true;
+      rejectError.value = "";
+      try {
+        await reservationsService.reject(rejectTarget.value.id, {
+          reason: rejectReason.value,
+        });
+        toast.success("Đã từ chối yêu cầu");
+        closeRejectModal();
+        loadReservations(pagination.current_page);
+      } catch (error) {
+        rejectError.value =
+          error.response?.data?.message || "Không thể từ chối";
+      } finally {
+        rejectLoading.value = false;
+      }
+    };
+
+    const createBorrow = (reservation) => {
+      selectedReservationForBorrow.value = reservation;
+      showCreateBorrowModal.value = true;
+    };
+
+    const closeCreateBorrowModal = () => {
+      showCreateBorrowModal.value = false;
+      selectedReservationForBorrow.value = null;
+      borrowLoading.value = false;
+    };
+
+    const submitCreateBorrow = async () => {
+      if (!selectedReservationForBorrow.value) return;
+
+      borrowLoading.value = true;
+      try {
+        console.log(
+          "Creating borrow for reservation ID:",
+          selectedReservationForBorrow.value
+        );
+        await reservationsService.createBorrow(
+          selectedReservationForBorrow.value.id
+        );
+        toast.success("Đã tạo phiếu mượn thành công");
+        closeCreateBorrowModal();
+        loadReservations(pagination.current_page);
+      } catch (error) {
+        toast.error(
+          error.response?.data?.message || "Không thể tạo phiếu mượn"
+        );
+        console.error(error);
+      } finally {
+        borrowLoading.value = false;
+      }
+    };
+
+    onMounted(() => {
+      loadReservations();
+    });
+
+    return {
+      filters,
+      headers,
+      statusMap,
+      reservations,
+      isLoading,
+      pagination,
+      loadReservations,
+      formatDate,
+      statusLabel,
+      statusClasses,
+      isPdfFile,
+      isImageFile,
+      getFileName,
+      showDetailModal,
+      selectedReservation,
+      openDetail,
+      closeDetail,
+      approveReservation,
+      deleteReservation,
+      showRejectModal,
+      rejectReason,
+      rejectError,
+      rejectLoading,
+      openRejectModal,
+      closeRejectModal,
+      submitReject,
+      showCreateBorrowModal,
+      selectedReservationForBorrow,
+      borrowLoading,
+      createBorrow,
+      closeCreateBorrowModal,
+      submitCreateBorrow,
+    };
+  },
 };
-
-const createBorrow = async (reservation) => {
-  selectedReservationForBorrow.value = reservation;
-  showCreateBorrowModal.value = true;
-};
-
-const closeCreateBorrowModal = () => {
-  showCreateBorrowModal.value = false;
-  selectedReservationForBorrow.value = null;
-  borrowLoading.value = false;
-};
-
-const submitCreateBorrow = async () => {
-  if (!selectedReservationForBorrow.value) return;
-
-  borrowLoading.value = true;
-  try {
-    console.log(
-      "Creating borrow for reservation ID:",
-      selectedReservationForBorrow.value
-    );
-    await reservationsService.createBorrow(
-      selectedReservationForBorrow.value.id
-    );
-    toast.success("Đã tạo phiếu mượn thành công");
-    closeCreateBorrowModal();
-    loadReservations(pagination.current_page);
-  } catch (error) {
-    toast.error(error.response?.data?.message || "Không thể tạo phiếu mượn");
-    console.error(error);
-  } finally {
-    borrowLoading.value = false;
-  }
-};
-
-onMounted(() => {
-  loadReservations();
-});
 </script>

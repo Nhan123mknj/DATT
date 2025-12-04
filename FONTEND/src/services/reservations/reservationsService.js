@@ -66,5 +66,16 @@ export const reservationsService = {
   createBorrow(id) {
     return apiClient.post(`/staff/reservations/${id}/create-borrow`)
   },
+  getCategories() {
+    return apiClient.get(`/device-categories`)
+  },
+
+  getDevicesByCategory(categoryId) {
+    return apiClient.get(`/device-categories/${categoryId}/devices`)
+  },
+
+  getDeviceUnitsByDevice(deviceId) {
+    return apiClient.get(`/devices/${deviceId}/units`)
+  },
 }
 

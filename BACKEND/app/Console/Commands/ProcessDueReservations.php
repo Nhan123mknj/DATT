@@ -51,8 +51,8 @@ class ProcessDueReservations extends Command
 
     private function borrowExists(int $reservationId): bool
     {
-        return \App\Models\Borrows::whereHas('details', function ($query) use ($reservationId) {
-            $query->where('notes', 'like', "%đặt trước #{$reservationId}%");
-        })->exists();
+        // Check in Borrows table, not BorrowsDetail
+        return \App\Models\Borrows::where('notes', 'like', "%đặt trước #{$reservationId}%")
+            ->exists();
     }
 }

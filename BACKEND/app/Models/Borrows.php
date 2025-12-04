@@ -18,7 +18,8 @@ class Borrows extends Model
         'expected_return_date',
         'actual_return_date',
         'status',
-        'notes'
+        'notes',
+        'commitment_file'
     ];
 
     public function borrower()

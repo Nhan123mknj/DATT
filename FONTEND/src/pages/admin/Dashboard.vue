@@ -158,135 +158,115 @@
   </div>
 </template>
 
-<script setup>
-import { onMounted, ref } from "vue";
+<script>
+import { reactive, onMounted } from "vue";
 import { useToast } from "vue-toastification";
 import { RouterLink } from "vue-router";
-import StatCard from "../../components/StatCard.vue";
+import StatCard from "../../components/common/StatCard.vue";
 import { usersService } from "../../services/users/usersService";
 import { deviceCategoriesService } from "../../services/devices/deviceCategoriesService";
 import { devicesService } from "../../services/devices/devicesService";
 import { reservationsService } from "../../services/reservations/reservationsService";
-
-const toast = useToast();
-
-const stats = ref({
-  users: 0,
-  categories: 0,
-  devices: 0,
-  pendingReservations: 0,
-});
-
-const recentReservations = ref([]);
-const reservationsLoading = ref(false);
-
-const quickActions = [
-  {
-    label: "Thêm người dùng",
-    description: "Tạo tài khoản mới cho nhân sự",
-    to: { name: "admin.users" },
-    icon: "user-plus",
+import { useDataTable } from "../../composables/fetchData/useDataTable";
+import useStatusLabel from "../../composables/utils/statusLabel";
+import useFormatDate from "../../composables/utils/formatDate";
+export default {
+  name: "Dashboard",
+  components: {
+    StatCard,
+    RouterLink,
   },
-  {
-    label: "Tạo danh mục",
-    description: "Quản lý nhóm thiết bị",
-    to: { name: "admin.deviceCategories" },
-    icon: "folder-plus",
+  setup() {
+    const toast = useToast();
+    const { statusReverse, statusClasses } = useStatusLabel();
+    const { formatDate } = useFormatDate();
+    const stats = reactive({
+      users: 0,
+      categories: 0,
+      devices: 0,
+      pendingReservations: 0,
+    });
+
+    const quickActions = [
+      {
+        label: "Thêm người dùng",
+        description: "Tạo tài khoản mới cho nhân sự",
+        to: { name: "admin.users" },
+        icon: "user-plus",
+      },
+      {
+        label: "Tạo danh mục",
+        description: "Quản lý nhóm thiết bị",
+        to: { name: "admin.deviceCategories" },
+        icon: "folder-plus",
+      },
+      {
+        label: "Thêm thiết bị",
+        description: "Cập nhật kho thiết bị",
+        to: { name: "admin.devices" },
+        icon: "microchip",
+      },
+      {
+        label: "Đơn vị thiết bị",
+        description: "Theo dõi tình trạng thiết bị",
+        to: { name: "admin.deviceUnits" },
+        icon: "boxes-stacked",
+      },
+    ];
+
+    const {
+      items: recentReservations,
+      isLoading: reservationsLoading,
+      loadData: loadReservations,
+    } = useDataTable({
+      fetchData: (params) =>
+        reservationsService.listStaff({
+          ...params,
+          per_page: 5,
+        }),
+      dataKey: "data",
+      perPage: 5,
+    });
+
+    const fetchStats = async () => {
+      try {
+        const [usersRes, categoriesRes, devicesRes, pendingRes] =
+          await Promise.allSettled([
+            usersService.getAllUser({ page: 1 }),
+            deviceCategoriesService.list({ page: 1 }),
+            devicesService.list({ page: 1 }),
+            reservationsService.listStaff({ status: ["pending"], per_page: 1 }),
+          ]);
+
+        const getTotal = (res, path) => {
+          if (res.status !== "fulfilled") return 0;
+          const data = path ? res.value.data[path] : res.value.data;
+          return data?.total ?? data?.data?.length ?? 0;
+        };
+
+        stats.users = getTotal(usersRes);
+        stats.categories = getTotal(categoriesRes, "categories");
+        stats.devices = getTotal(devicesRes, "devices");
+        stats.pendingReservations = getTotal(pendingRes, "data");
+      } catch (error) {
+        toast.error("Không thể tải thống kê");
+      }
+    };
+
+    onMounted(() => {
+      fetchStats();
+      loadReservations();
+    });
+
+    return {
+      stats,
+      quickActions,
+      recentReservations,
+      reservationsLoading,
+      formatDate,
+      statusLabel: statusReverse,
+      statusClasses,
+    };
   },
-  {
-    label: "Thêm thiết bị",
-    description: "Cập nhật kho thiết bị",
-    to: { name: "admin.devices" },
-    icon: "microchip",
-  },
-  {
-    label: "Đơn vị thiết bị",
-    description: "Theo dõi tình trạng thiết bị",
-    to: { name: "admin.deviceUnits" },
-    icon: "boxes-stacked",
-  },
-];
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return "Không xác định";
-  return new Date(dateStr).toLocaleDateString("vi-VN");
 };
-
-const statusLabel = (status) => {
-  const map = {
-    pending: "Chờ duyệt",
-    approved: "Đã duyệt",
-    rejected: "Từ chối",
-    cancelled: "Đã hủy",
-    completed: "Hoàn thành",
-  };
-  return map[status] || status;
-};
-
-const statusClasses = (status) => {
-  switch (status) {
-    case "approved":
-      return "bg-green-100 text-green-700";
-    case "rejected":
-    case "cancelled":
-      return "bg-red-100 text-red-600";
-    case "completed":
-      return "bg-emerald-100 text-emerald-600";
-    default:
-      return "bg-amber-100 text-amber-700";
-  }
-};
-
-const fetchStats = async () => {
-  try {
-    const [usersRes, categoriesRes, devicesRes, pendingRes] =
-      await Promise.allSettled([
-        usersService.getAllUser(1, 1),
-        deviceCategoriesService.list({ page: 1 }),
-        devicesService.list({ page: 1 }),
-        reservationsService.listStaff({ status: ["pending"], per_page: 1 }),
-      ]);
-
-    if (usersRes.status === "fulfilled") {
-      stats.value.users =
-        usersRes.value.data.total ?? usersRes.value.data?.data?.length ?? 0;
-    }
-    if (categoriesRes.status === "fulfilled") {
-      const payload = categoriesRes.value.data.categories;
-      stats.value.categories = payload?.total ?? payload?.data?.length ?? 0;
-    }
-    if (devicesRes.status === "fulfilled") {
-      const payload = devicesRes.value.data.devices;
-      stats.value.devices = payload?.total ?? payload?.data?.length ?? 0;
-    }
-    if (pendingRes.status === "fulfilled") {
-      const payload = pendingRes.value.data.data;
-      stats.value.pendingReservations = payload?.total ?? 0;
-    }
-  } catch (error) {
-    toast.error("Không thể tải thống kê");
-  }
-};
-
-const fetchRecentReservations = async () => {
-  reservationsLoading.value = true;
-  try {
-    const res = await reservationsService.listStaff({ per_page: 5 });
-    const payload = res.data.data;
-    recentReservations.value = payload?.data || [];
-  } catch (error) {
-    if (error.response?.status !== 404) {
-      toast.error("Không thể tải danh sách đặt trước");
-    } else {
-      recentReservations.value = [];
-    }
-  } finally {
-    reservationsLoading.value = false;
-  }
-};
-
-onMounted(() => {
-  fetchStats();
-  fetchRecentReservations();
-});
 </script>

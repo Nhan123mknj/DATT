@@ -9,62 +9,71 @@
           Danh sách thiết bị cùng thông tin nhà sản xuất và danh mục.
         </p>
       </div>
-      <Button color="primary" @click="openCreateModal">
-        <font-awesome-icon icon="plus" class="mr-2" />
-        Thêm thiết bị
-      </Button>
+      <div class="flex gap-2">
+        <Button
+          v-if="selectedDevices.length > 0"
+          label="Xóa đã chọn"
+          color="danger"
+          @click="deleteSelected"
+        >
+          <template #icon>
+            <font-awesome-icon icon="trash" class="mr-2" />
+          </template>
+        </Button>
+        <Button
+          v-if="selectedDevices.length > 0"
+          label="Xuất Excel"
+          color="success"
+          @click="exportExcel"
+        >
+          <template #icon>
+            <font-awesome-icon icon="file-excel" class="mr-2" />
+          </template>
+        </Button>
+        <Button label="Thêm thiết bị" @click="openCreate">
+          <template #icon>
+            <font-awesome-icon icon="plus" class="mr-2" />
+          </template>
+        </Button>
+      </div>
     </div>
 
     <div
       class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-4"
     >
       <div class="grid gap-3 md:grid-cols-4">
-        <input
-          v-model="filters.search"
-          type="text"
-          class="px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-          placeholder="Tìm kiếm theo tên hoặc hãng..."
-        />
-        <select
+        <SearchBar v-on:handleSearch="handleSearch" />
+        <Dropdown
           v-model="filters.category_id"
-          class="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700"
-        >
-          <option value="">Tất cả danh mục</option>
-          <option
-            v-for="category in categories"
-            :key="category.id"
-            :value="category.id"
-          >
-            {{ category.name }}
-          </option>
-        </select>
-        <select
+          :options="categories"
+          label="Danh mục"
+        />
+        <Dropdown
           v-model="filters.is_active"
-          class="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700"
-        >
-          <option value="">-- Trạng thái --</option>
-          <option value="1">Kích hoạt</option>
-          <option value="0">Tạm dừng</option>
-        </select>
+          :options="statusOptions"
+          label="Trạng thái"
+          nameKey="label"
+          valueKey="value"
+        />
         <div class="flex gap-2">
-          <button
-            class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+          <Button
+            label="Đặt lại"
             @click="resetFilters"
-          >
-            Đặt lại
-          </button>
-          <button
-            class="px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-700 flex-1"
-            @click="loadDevices()"
-          >
-            Lọc
-          </button>
+            color="gray"
+            variant="outlined"
+          />
+          <Button label="Lọc" @click="loadData()" />
         </div>
       </div>
 
       <LoadingSkeleton v-if="isLoading" />
       <div v-else>
-        <Table :data="devices" :headers="headers">
+        <Table
+          :data="devices"
+          :headers="headers"
+          selectable
+          v-model:selectedItems="selectedDevices"
+        >
           <template #category="{ item }">
             {{ item.category?.name || "Chưa phân loại" }}
           </template>
@@ -87,13 +96,13 @@
             <div class="flex gap-2">
               <button
                 class="px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm"
-                @click="openEditModal(item)"
+                @click="openEdit(item)"
               >
                 Sửa
               </button>
               <button
                 class="px-3 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm"
-                @click="deleteDevice(item)"
+                @click="deleteItem(item.id)"
               >
                 Xóa
               </button>
@@ -103,13 +112,18 @@
         <Pagination
           v-if="pagination.total > pagination.per_page"
           :links="pagination.links"
-          @page-changed="loadDevices"
+          @page-changed="loadData"
         />
       </div>
     </div>
 
-    <Modal :show="showModal" :title="modalTitle" @close="closeModal">
-      <form class="space-y-4" @submit.prevent="saveDevice">
+    <ModalForm
+      :show="showModal"
+      :title="modalTitle"
+      @close="closeModal"
+      @submit="saveDevice"
+    >
+      <div class="space-y-4">
         <div>
           <label class="text-sm font-medium text-gray-700">Tên thiết bị</label>
           <input
@@ -187,8 +201,7 @@
             placeholder="CPU, RAM, Bộ nhớ..."
           ></textarea>
         </div>
-        <button type="submit" class="hidden" aria-hidden="true"></button>
-      </form>
+      </div>
       <template #footer>
         <div class="flex gap-3">
           <button
@@ -199,194 +212,187 @@
             Hủy
           </button>
           <button
-            type="button"
+            type="submit"
             class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500"
-            @click="saveDevice"
           >
             {{ modalMode === "create" ? "Thêm mới" : "Cập nhật" }}
           </button>
         </div>
       </template>
-    </Modal>
+    </ModalForm>
   </div>
 </template>
 
-<script setup>
-import { computed, onMounted, reactive, ref } from "vue";
-import { useToast } from "vue-toastification";
-import Table from "../../../components/Table.vue";
-import Button from "../../../components/Button.vue";
-import LoadingSkeleton from "../../../components/LoadingSkeleton.vue";
-import Pagination from "../../../components/Pagination.vue";
-import Modal from "../../../components/Modal.vue";
+<script>
+import { ref, reactive, computed, onMounted, watch } from "vue";
+
+import Table from "../../../components/common/Table.vue";
+import Button from "../../../components/common/Button.vue";
+import LoadingSkeleton from "../../../components/common/LoadingSkeleton.vue";
+import Pagination from "../../../components/common/Pagination.vue";
+import ModalForm from "../../../components/ModalForm.vue";
+import SearchBar from "../../../components/common/SearchBar.vue";
+import Dropdown from "../../../components/common/Dropdown.vue";
+
 import { devicesService } from "../../../services/devices/devicesService";
 import { deviceCategoriesService } from "../../../services/devices/deviceCategoriesService";
 
-const toast = useToast();
+import { useToast } from "vue-toastification";
+import { useDataTable } from "../../../composables/fetchData/useDataTable";
+import { useForm } from "../../../composables/useForm";
+import { useDeviceFilters } from "../../../composables/filter/useDeviceFilter";
 
-const isLoading = ref(false);
-const devices = ref([]);
-const categories = ref([]);
-const pagination = reactive({
-  current_page: 1,
-  per_page: 10,
-  total: 0,
-  last_page: 1,
-  links: [],
-});
+export default {
+  name: "Devices",
 
-const headers = {
-  name: "Tên thiết bị",
-  category: "Danh mục",
-  manufacturer: "Hãng",
-  model: "Model",
-  total_units: "Đơn vị",
-  is_active: "Trạng thái",
-};
+  components: {
+    Table,
+    Button,
+    LoadingSkeleton,
+    Pagination,
+    ModalForm,
+    SearchBar,
+    Dropdown,
+  },
 
-const filters = reactive({
-  search: "",
-  category_id: "",
-  is_active: "",
-});
+  setup() {
+    const toast = useToast();
 
-const showModal = ref(false);
-const modalMode = ref("create");
-const form = reactive({
-  id: null,
-  name: "",
-  category_id: "",
-  manufacturer: "",
-  model: "",
-  specifications: "",
-  is_active: 1,
-});
-const errors = reactive({});
+    const { filters, resetFilters, buildParams } = useDeviceFilters();
 
-const modalTitle = computed(() =>
-  modalMode.value === "create" ? "Thêm thiết bị" : "Cập nhật thiết bị"
-);
+    const categories = ref([]);
 
-const loadCategories = async () => {
-  try {
-    const { data } = await deviceCategoriesService.list({ page: 1 });
-    categories.value = data.categories?.data || [];
-  } catch {
-    categories.value = [];
-  }
-};
-
-const loadDevices = async (page = 1) => {
-  isLoading.value = true;
-  try {
-    const params = {
-      page,
-      search: filters.search || undefined,
-      category_id: filters.category_id || undefined,
-      is_active: filters.is_active !== "" ? filters.is_active : undefined,
+    const loadCategories = async () => {
+      try {
+        const { data } = await deviceCategoriesService.list({ page: 1 });
+        categories.value = data.categories?.data || [];
+      } catch {
+        categories.value = [];
+      }
     };
-    const { data } = await devicesService.list(params);
-    const payload = data.devices;
-    devices.value = payload?.data || [];
-    pagination.current_page = payload?.current_page || 1;
-    pagination.per_page = payload?.per_page || 10;
-    pagination.total = payload?.total || 0;
-    pagination.last_page = payload?.last_page || 1;
-    pagination.links = payload?.links || [];
-  } catch (error) {
-    if (error.response?.status === 404) {
-      devices.value = [];
-      pagination.total = 0;
-    } else {
-      toast.error("Không thể tải danh sách thiết bị");
-    }
-  } finally {
-    isLoading.value = false;
-  }
-};
 
-const openCreateModal = () => {
-  modalMode.value = "create";
-  resetForm();
-  showModal.value = true;
-};
+    const {
+      items: devices,
+      isLoading,
+      pagination,
+      loadData,
+      deleteItem,
+    } = useDataTable({
+      fetchData: (params) =>
+        devicesService.list({ ...params, ...buildParams() }),
+      deleteData: (id) => devicesService.remove(id),
+      dataKey: "devices",
+      confirmDeleteMsg: "Bạn chắc chắn muốn xóa thiết bị này?",
+    });
 
-const openEditModal = (device) => {
-  modalMode.value = "edit";
-  form.id = device.id;
-  form.name = device.name;
-  form.category_id = device.category_id;
-  form.manufacturer = device.manufacturer;
-  form.model = device.model;
-  form.specifications = device.specifications;
-  form.is_active = device.is_active ? 1 : 0;
-  showModal.value = true;
-};
+    const {
+      form,
+      errors,
+      showModal,
+      modalMode,
+      openCreate,
+      openEdit,
+      closeModal,
+      save,
+    } = useForm({
+      createData: (data) => devicesService.create(data),
+      updateData: (id, data) => devicesService.update(id, data),
+      initialForm: {
+        id: null,
+        name: "",
+        category_id: "",
+        manufacturer: "",
+        model: "",
+        specifications: "",
+        is_active: 1,
+      },
+    });
 
-const closeModal = () => {
-  showModal.value = false;
-};
+    const modalTitle = computed(() =>
+      modalMode.value === "create" ? "Thêm thiết bị" : "Cập nhật thiết bị"
+    );
 
-const resetForm = () => {
-  form.id = null;
-  form.name = "";
-  form.category_id = "";
-  form.manufacturer = "";
-  form.model = "";
-  form.specifications = "";
-  form.is_active = 1;
-  Object.keys(errors).forEach((key) => delete errors[key]);
-};
+    const selectedDevices = ref([]);
 
-const saveDevice = async () => {
-  Object.keys(errors).forEach((key) => delete errors[key]);
-  const payload = {
-    name: form.name,
-    category_id: form.category_id || null,
-    manufacturer: form.manufacturer,
-    model: form.model,
-    specifications: form.specifications,
-    is_active: form.is_active ? 1 : 0,
-  };
-  try {
-    if (modalMode.value === "create") {
-      await devicesService.create(payload);
-      toast.success("Đã thêm thiết bị");
-    } else {
-      await devicesService.update(form.id, payload);
-      toast.success("Đã cập nhật thiết bị");
-    }
-    closeModal();
-    loadDevices(pagination.current_page);
-  } catch (error) {
-    if (error.response?.status === 422) {
-      Object.assign(errors, error.response.data.errors);
-    } else {
-      toast.error("Không thể lưu thiết bị");
-    }
-  }
-};
+    watch(devices, () => {
+      selectedDevices.value = [];
+    });
 
-const deleteDevice = async (device) => {
-  if (!confirm(`Bạn chắc chắn muốn xóa thiết bị "${device.name}"?`)) return;
-  try {
-    await devicesService.remove(device.id);
-    toast.success("Đã xóa thiết bị");
-    loadDevices(pagination.current_page);
-  } catch (error) {
-    toast.error(error.response?.data?.error || "Không thể xóa thiết bị");
-  }
-};
+    const deleteSelected = async () => {
+      if (
+        !confirm(
+          `Bạn chắc chắn muốn xóa ${selectedDevices.value.length} thiết bị đã chọn?`
+        )
+      )
+        return;
+      try {
+        await Promise.all(
+          selectedDevices.value.map((device) =>
+            devicesService.remove(device.id)
+          )
+        );
 
-const resetFilters = () => {
-  filters.search = "";
-  filters.category_id = "";
-  filters.is_active = "";
-  loadDevices();
-};
+        toast.success("Đã xóa các thiết bị đã chọn");
+        loadData(pagination.current_page);
+        selectedDevices.value = [];
+      } catch {
+        toast.error("Có lỗi khi xóa thiết bị");
+      }
+    };
 
-onMounted(() => {
-  loadCategories();
-  loadDevices();
-});
+    const handleSearch = (value) => {
+      filters.search = value;
+      loadData();
+    };
+
+    const saveDevice = () => {
+      save(() => loadData(pagination.current_page));
+    };
+
+    const statusOptions = [
+      { value: 1, label: "Kích hoạt" },
+      { value: 0, label: "Tạm dừng" },
+    ];
+
+    const headers = {
+      name: "Tên thiết bị",
+      category: "Danh mục",
+      manufacturer: "Nhà sản xuất",
+      model: "Model",
+      is_active: "Trạng thái",
+      total_units: "Số lượng",
+    };
+
+    onMounted(() => {
+      loadCategories();
+      loadData();
+    });
+
+    return {
+      toast,
+      filters,
+      resetFilters,
+      categories,
+      devices,
+      isLoading,
+      pagination,
+      loadData,
+      deleteItem,
+      form,
+      errors,
+      showModal,
+      modalMode,
+      openCreate,
+      openEdit,
+      closeModal,
+      saveDevice,
+      modalTitle,
+      selectedDevices,
+      deleteSelected,
+      handleSearch,
+      headers,
+      statusOptions,
+    };
+  },
+};
 </script>

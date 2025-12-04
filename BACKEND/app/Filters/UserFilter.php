@@ -44,4 +44,12 @@ class UserFilter extends BaseFilter
             $this->query->orderBy($field, $direction);
         }
     }
+    public function search($value)
+    {
+        $this->query->where(function ($q) use ($value) {
+            $q->where('name', 'like', "%{$value}%")
+                ->orWhere('email', 'like', "%{$value}%")
+                ->orWhere('id', $value);
+        });
+}
 }
