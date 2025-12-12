@@ -24,9 +24,14 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only([
-            'name', 'email', 'role', 'is_active',
-            'from_date', 'to_date',
-            'order_by', 'direction',
+            'name',
+            'email',
+            'role',
+            'is_active',
+            'from_date',
+            'to_date',
+            'order_by',
+            'direction',
             'search'
         ]);
 
@@ -81,7 +86,7 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $id,
-            'role' => 'sometimes|required|in:admin,borrower,staff',
+            'role' => 'sometimes|required|in:student,teacher,staff,admin,borrower',
         ]);
 
         if ($validator->fails()) {

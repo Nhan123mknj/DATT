@@ -93,12 +93,12 @@
               </button>
             </div>
             <p
-              v-if="passwordErrors.new_password_confirmation"
+              v-if="passwordErrors.confirm_password"
               class="text-xs text-red-500 mt-1"
             >
               {{
-                passwordErrors.new_password_confirmation?.[0] ||
-                passwordErrors.new_password_confirmation
+                passwordErrors.confirm_password?.[0] ||
+                passwordErrors.confirm_password
               }}
             </p>
           </div>

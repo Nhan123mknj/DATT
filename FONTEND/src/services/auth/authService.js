@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import apiClient from '../api/apiClient'
+import { useNotifications } from '../../stores/notificationStore'
 
 const user = ref(null)
 const token = ref(localStorage.getItem('token') || null)
@@ -31,6 +32,13 @@ class AuthService {
       user.value = tokenData.user;
       persistAuth();
 
+      try {
+        const notifications = useNotifications();
+        notifications.startPolling();
+      } catch (error) {
+        console.error('[Auth] Failed to start notification polling:', error);
+      }
+
       return { success: true, role: user.value.role };
     } else {
       return { success: false, error: res.data.message };
@@ -54,6 +62,14 @@ class AuthService {
         console.warn('Logout request failed', error)
       }
     } finally {
+      try {
+        const notifications = useNotifications();
+        notifications.stopPolling();
+        notifications.clear();
+      } catch (error) {
+        console.error('[Auth] Failed to stop notifications:', error);
+      }
+
       user.value = null
       token.value = null
       persistAuth()

@@ -103,7 +103,7 @@
 import { RouterLink } from "vue-router";
 import { useToast } from "vue-toastification";
 import StatCard from "../../components/common/StatCard.vue";
-import { reservationsService } from "../../services/reservations/reservationsService";
+import { reservationsService } from "../../services/staff/reservationsService";
 
 export default {
   name: "StaffDashboard",
@@ -163,7 +163,7 @@ export default {
         const statuses = ["pending", "approved", "rejected"];
         const responses = await Promise.allSettled(
           statuses.map((status) =>
-            reservationsService.listStaff({ status: [status], per_page: 1 })
+            reservationsService.list({ status: [status], per_page: 1 })
           )
         );
 
@@ -175,7 +175,7 @@ export default {
         });
 
         const today = new Date().toISOString().split("T")[0];
-        const { data } = await reservationsService.listStaff({
+        const { data } = await reservationsService.list({
           from_date: today,
           to_date: today,
           per_page: 1,
@@ -188,7 +188,7 @@ export default {
     async fetchRecentReservations() {
       this.recentLoading = true;
       try {
-        const { data } = await reservationsService.listStaff({ per_page: 5 });
+        const { data } = await reservationsService.list({ per_page: 5 });
         this.recentReservations = data.data?.data || [];
       } catch (error) {
         if (error.response?.status === 404) {

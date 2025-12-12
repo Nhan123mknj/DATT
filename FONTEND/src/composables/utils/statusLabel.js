@@ -9,6 +9,20 @@ export default function (){
         };
         return map[status] || status;
     }
+    
+    const statusBorrowLabel = (status) => {
+        const map = {
+            pending: "Chờ duyệt",
+            approved: "Đã duyệt",
+            rejected: "Từ chối",
+            cancelled: "Đã hủy",
+            completed: "Hoàn thành",
+            borrowed: "Đang mượn",
+            overdue: "Quá hạn",
+        };
+        return map[status] || status;
+    }
+    
     const statusClasses = (status) => {
         switch (status) {
             case "approved":
@@ -23,25 +37,35 @@ export default function (){
                 return "bg-amber-100 text-amber-700";
         }
     }
-    const statusActive = (isActive) => {
-     if(isActive){
-        return "bg-green-100 text-green-700";
-     }else{
-        return "bg-red-100 text-red-600";
-     }
+    
+    const statusActiveClass = (isActive) => {
+        if(isActive){
+            return "bg-green-100 text-green-700";
+        }else{
+            return "bg-gray-100 text-gray-600";
+        }
     }
+    
+    const statusActive = (isActive) => {
+        return isActive ? "Kích hoạt" : "Vô hiệu hóa";
+    }
+    
     const getRoleLabel = (role) => {
         const map = {
             admin: "Quản trị viên",
             staff: "Nhân viên",
-            borrower: "Người dùng",
+            student: "Sinh viên",
+            teacher: "Giảng viên",
         };
         return map[role] || role;
     }
+    
     return {
         statusReverseLabel,
         statusClasses,
         statusActive,
-        getRoleLabel
+        statusActiveClass,
+        getRoleLabel,
+        statusBorrowLabel
     }
 }

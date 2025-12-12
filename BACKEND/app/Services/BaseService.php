@@ -25,15 +25,37 @@ class BaseService
         }
     }
 
-    // protected function checkUserBorrowLimit($userId)
-    // {
-    //     $count = Borrows::where('borrower_id', $userId)
-    //         ->where('status', 'borrowed')
-    //         ->count();
-    //     if ($count >= 3) {
-    //         throw ValidationException::withMessages([
-    //             "Tài khoản của bạn đã mượn quá nhiều."
-    //         ]);
-    //     }
-    // }
+    /**
+     * Check if user has reached their borrow limit
+     * 
+     * @param int $userId
+     * @throws ValidationException
+     */
+    protected function checkUserBorrowLimit($userId)
+    {
+        $user = \App\Models\User::findOrFail($userId);
+
+        // Check if user is suspended
+        if (!$user->is_active) {
+            throw ValidationException::withMessages([
+                'user' => 'Tài khoản của bạn đã bị tạm ngừng. Không thể mượn thiết bị.'
+            ]);
+        }
+
+        $activeBorrowsCount = Borrows::where('borrower_id', $userId)
+            ->whereIn('status', ['borrowed', 'approved', 'pending'])
+            ->count();
+
+        $limit = match ($user->role) {
+            'teacher' => 5,  
+            'student' => 3,  
+            default => 1     
+        };
+
+        if ($activeBorrowsCount >= $limit) {
+            throw ValidationException::withMessages([
+                'borrow_limit' => "Bạn đã đạt giới hạn mượn ({$limit} phiếu). Vui lòng trả thiết bị trước khi mượn thêm."
+            ]);
+        }
+    }
 }

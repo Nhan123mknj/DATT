@@ -39,6 +39,28 @@
             </p>
           </div>
 
+          <!-- Student Code or Teacher Code -->
+          <div
+            v-if="
+              currentUser.student?.student_code ||
+              currentUser.teacher?.teacher_code
+            "
+          >
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              {{ currentUser.student ? "Mã học sinh" : "Mã giáo viên" }}
+            </label>
+            <input
+              type="text"
+              :value="
+                currentUser.student?.student_code ||
+                currentUser.teacher?.teacher_code
+              "
+              disabled
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-500"
+            />
+            <p class="text-xs text-gray-500 mt-1">Liên hệ admin để thay đổi</p>
+          </div>
+
           <!-- Phone -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">

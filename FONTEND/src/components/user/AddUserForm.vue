@@ -34,7 +34,6 @@
         />
       </div>
 
-
       <div>
         <label for="email" class="block text-sm font-medium text-gray-900">
           Email <span class="text-red-500">*</span>
@@ -52,7 +51,6 @@
           ]"
         />
       </div>
-
 
       <div>
         <label for="role" class="block text-sm font-medium text-gray-900">
@@ -72,10 +70,10 @@
           <option disabled value="">-- Chọn role --</option>
           <option value="admin">Admin</option>
           <option value="staff">Staff</option>
-          <option value="borrower">Người mượn</option>
+          <option value="student">Học sinh</option>
+          <option value="teacher">Giảng viên</option>
         </select>
       </div>
-
 
       <div>
         <label class="block text-sm font-medium text-gray-900">
@@ -127,7 +125,7 @@
 </template>
 
 <script>
-import { usersService } from "../../services/users/usersService";
+import { usersService } from "../../services/admin/usersService";
 import { useToast } from "vue-toastification";
 import ModalForm from "../ModalForm.vue";
 

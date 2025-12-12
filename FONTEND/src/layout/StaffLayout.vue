@@ -21,6 +21,8 @@
           </div>
 
           <div class="flex items-center">
+            <NotificationDropdown />
+
             <div class="ml-3 relative">
               <div class="flex items-center space-x-4">
                 <img
@@ -54,15 +56,18 @@
 
 <script>
 import { RouterLink } from "vue-router";
-import { computed } from "vue";
+import NotificationDropdown from "../components/common/NotificationDropdown.vue";
 import authService, { user } from "../services/auth/authService";
+
 export default {
   name: "StaffLayout",
   components: {
     RouterLink,
+    NotificationDropdown,
   },
   computed: {
     currentUser() {
+      console.log(user);
       return user.value;
     },
   },

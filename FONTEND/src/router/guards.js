@@ -14,7 +14,6 @@ if (typeof window !== 'undefined') {
   window.resetTokenVerification = resetTokenVerification
 }
 
-// Route guard to check authentication
 export const requireAuth = async (to, from, next) => {
   
   if (!authService.isAuthenticated()) {
@@ -26,29 +25,32 @@ export const requireAuth = async (to, from, next) => {
 
   if (from.name === 'login') {
 
-    tokenVerified = true // Mark as verified since we just logged in
+    tokenVerified = true 
     next()
     return
   }
 
-  // If we've already verified token in this session, skip verification
   if (tokenVerified) {
-    console.log('Token already verified in this session, allowing access')
     next()
     return
   }
 
-  // For all other cases, verify token with backend
-  console.log('Verifying token with backend')
   const isValid = await authService.verifyToken()
   if (!isValid) {
-    console.log('Token verification failed, redirecting to login')
     tokenVerified = false
     next({ name: 'login' })
     return
   }
 
-  tokenVerified = true
+  
+  try {
+    const { useNotifications } = await import('../stores/notificationStore')
+    const notifications = useNotifications()
+    notifications.startPolling()
+  } catch (error) {
+    console.error('[Guards] Failed to initialize notifications:', error)
+  }
+  
   next()
 }
 
@@ -56,7 +58,10 @@ export const requireAuth = async (to, from, next) => {
 export const requireRole = (role) => {
   return (to, from, next) => {
     const user = authService.getUser();
-    if (user && user.role === role) {
+    // Map student/teacher to borrower for route checking
+    const userRole = (user?.role === 'student' || user?.role === 'teacher') ? 'borrower' : user?.role;
+    
+    if (user && userRole === role) {
       next();
     } else {
 
@@ -68,6 +73,8 @@ export const requireRole = (role) => {
           case 'staff': 
             next({ name: 'staff.dashboard' });
             break;
+          case 'student':
+          case 'teacher':
           case 'borrower':
             next({ name: 'borrower.dashboard' });
             break;
@@ -94,11 +101,12 @@ export const redirectIfAuthenticated = (to, from, next) => {
       case 'staff':
         targetRoute = 'staff.dashboard';
         break;
+      case 'student':
+      case 'teacher':
       case 'borrower':
         targetRoute = 'borrower.dashboard';
         break;
       default:
-        // Nếu role không hợp lệ, cho phép ở lại login
         next();
         return;
     }

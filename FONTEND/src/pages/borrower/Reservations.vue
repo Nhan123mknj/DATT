@@ -11,11 +11,13 @@
       </div>
       <Button
         color="primary"
+        label="Tạo đặt trước"
         @click="goToCreate"
         class="shadow-lg shadow-indigo-200"
       >
-        <font-awesome-icon icon="plus" class="mr-2" />
-        Tạo đặt trước
+        <template #icon>
+          <font-awesome-icon icon="plus" class="mr-2" />
+        </template>
       </Button>
     </div>
 
@@ -53,7 +55,7 @@
           </button>
           <button
             class="flex-1 sm:flex-none px-6 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-medium transition-colors text-sm shadow-sm"
-            @click="loadReservations()"
+            @click="handleLoadReservations()"
           >
             <font-awesome-icon icon="filter" class="mr-2" />
             Lọc
@@ -80,7 +82,7 @@
                 class="px-3 py-1 rounded-full text-xs font-semibold"
                 :class="statusClasses(item.status)"
               >
-                {{ statusLabel(item.status) }}
+                {{ statusReverseLabel(item.status) }}
               </span>
             </template>
             <template #reserved_from="{ item }">
@@ -110,6 +112,13 @@
                   Chi tiết
                 </button>
                 <button
+                  v-if="item.status === 'pending'"
+                  class="px-3 py-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 text-sm font-medium transition-colors"
+                  @click="goToEdit(item)"
+                >
+                  Sửa
+                </button>
+                <button
                   v-if="['pending', 'approved'].includes(item.status)"
                   class="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium transition-colors"
                   @click="cancelReservation(item)"
@@ -123,7 +132,7 @@
             <Pagination
               v-if="pagination.total > pagination.per_page"
               :links="pagination.links"
-              @page-changed="loadReservations"
+              @page-changed="handleLoadReservations"
             />
           </div>
         </div>
@@ -161,7 +170,7 @@
               class="px-3 py-1 rounded-full text-xs font-semibold inline-block"
               :class="statusClasses(selectedReservation.status)"
             >
-              {{ statusLabel(selectedReservation.status) }}
+              {{ statusReverseLabel(selectedReservation.status) }}
             </span>
           </div>
         </div>
@@ -187,7 +196,6 @@
           </div>
         </div>
 
-        <!-- Devices List -->
         <div>
           <p class="font-bold text-gray-900 mb-3 flex items-center gap-2">
             <font-awesome-icon icon="boxes" class="text-gray-400" />
@@ -227,7 +235,6 @@
           </div>
         </div>
 
-        <!-- Notes -->
         <div
           v-if="selectedReservation.notes"
           class="bg-amber-50 border border-amber-100 rounded-xl p-4"
@@ -239,7 +246,6 @@
           <p class="text-amber-900">{{ selectedReservation.notes }}</p>
         </div>
 
-        <!-- Commitment File -->
         <div
           v-if="selectedReservation.commitment_file"
           class="bg-blue-50 border border-blue-100 rounded-xl p-4"
@@ -309,14 +315,17 @@
 </template>
 
 <script>
+import { ref, reactive, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useToast } from "vue-toastification";
 import Table from "../../components/common/Table.vue";
 import Button from "../../components/common/Button.vue";
 import LoadingSkeleton from "../../components/common/LoadingSkeleton.vue";
 import Pagination from "../../components/common/Pagination.vue";
 import Modal from "../../components/Modal.vue";
-import { reservationsService } from "../../services/borrower/reservationsService";
+import { useReservations } from "../../composables/fetchData/borrower/useReservations";
+import useStatusLabel from "../../composables/utils/statusLabel";
+import useFormatDate from "../../composables/utils/formatDate";
+import { useFileHelpers } from "../../composables/utils/useFileHelpers";
 
 export default {
   name: "BorrowerReservations",
@@ -327,132 +336,103 @@ export default {
     Pagination,
     Modal,
   },
-  data() {
-    return {
-      headers: {
-        reserved_from: "Từ ngày",
-        reserved_until: "Đến ngày",
-        status: "Trạng thái",
-      },
-      statusMap: {
-        pending: "Chờ duyệt",
-        approved: "Đã duyệt",
-        rejected: "Từ chối",
-        cancelled: "Đã hủy",
-        completed: "Hoàn thành",
-      },
-      reservations: [],
-      pagination: {
-        current_page: 1,
-        per_page: 10,
-        total: 0,
-        last_page: 1,
-        links: [],
-      },
-      filters: {
-        status: "",
-      },
-      isLoading: false,
-      showDetailModal: false,
-      selectedReservation: null,
-    };
-  },
-  mounted() {
-    this.loadReservations();
-  },
-  methods: {
-    statusLabel(status) {
-      return this.statusMap[status] || status;
-    },
-    statusClasses(status) {
-      switch (status) {
-        case "approved":
-          return "bg-green-100 text-green-700";
-        case "pending":
-          return "bg-amber-100 text-amber-700";
-        case "rejected":
-        case "cancelled":
-          return "bg-red-100 text-red-600";
-        default:
-          return "bg-gray-100 text-gray-600";
-      }
-    },
-    formatDate(dateStr) {
-      if (!dateStr) return "—";
-      return new Date(dateStr).toLocaleDateString("vi-VN");
-    },
-    isPdfFile(filePath) {
-      return filePath?.toLowerCase().endsWith(".pdf");
-    },
-    isImageFile(filePath) {
-      if (!filePath) return false;
-      const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
-      return imageExtensions.some((ext) =>
-        filePath.toLowerCase().endsWith(ext)
-      );
-    },
-    getFileName(filePath) {
-      if (!filePath) return "";
-      return filePath.split("/").pop();
-    },
-    async loadReservations(page = 1) {
-      this.isLoading = true;
-      try {
-        const params = {
-          page,
-          status: this.filters.status ? [this.filters.status] : undefined,
-        };
-        const { data } = await reservationsService.listBorrower(params);
-        const payload = data.data;
-        this.reservations = payload?.data || [];
-        this.pagination.current_page = payload?.current_page || 1;
-        this.pagination.per_page = payload?.per_page || 10;
-        this.pagination.total = payload?.total || 0;
-        this.pagination.last_page = payload?.last_page || 1;
-        this.pagination.links = payload?.links || [];
-      } catch (error) {
-        if (error.response?.status === 404) {
-          this.reservations = [];
-          this.pagination.total = 0;
-        } else {
-          this.toast.error("Không thể tải đặt trước");
-        }
-      } finally {
-        this.isLoading = false;
-      }
-    },
-    goToCreate() {
-      this.router.push({ name: "borrower.reservations.create" });
-    },
-    async cancelReservation(reservation) {
-      if (!confirm("Bạn chắc chắn muốn hủy yêu cầu này?")) return;
-      try {
-        await reservationsService.cancelBorrower(reservation.id);
-        this.toast.success("Đã hủy yêu cầu");
-        this.loadReservations(this.pagination.current_page);
-      } catch (error) {
-        this.toast.error(
-          error.response?.data?.message || "Không thể hủy yêu cầu"
-        );
-      }
-    },
-    showDetails(reservation) {
-      this.selectedReservation = reservation;
-      this.showDetailModal = true;
-    },
-    closeDetail() {
-      this.showDetailModal = false;
-      this.selectedReservation = null;
-    },
-    resetFilters() {
-      this.filters.status = "";
-      this.loadReservations();
-    },
-  },
   setup() {
     const router = useRouter();
-    const toast = useToast();
-    return { router, toast };
+
+    const {
+      reservations,
+      pagination,
+      isLoading,
+      loadReservations,
+      cancelReservation: cancelReservationApi,
+    } = useReservations();
+
+    const { statusReverseLabel, statusClasses } = useStatusLabel();
+    const { formatDate } = useFormatDate();
+    const { isPdfFile, isImageFile, getFileName } = useFileHelpers();
+
+    const filters = reactive({
+      status: "",
+    });
+
+    const showDetailModal = ref(false);
+    const selectedReservation = ref(null);
+
+    const headers = {
+      reserved_from: "Từ ngày",
+      reserved_until: "Đến ngày",
+      status: "Trạng thái",
+    };
+
+    const statusMap = {
+      pending: "Chờ duyệt",
+      approved: "Đã duyệt",
+      rejected: "Từ chối",
+      cancelled: "Đã hủy",
+      completed: "Hoàn thành",
+    };
+
+    const goToCreate = () => {
+      router.push({ name: "borrower.reservations.create" });
+    };
+
+    const goToEdit = (reservation) => {
+      router.push({
+        name: "borrower.reservations.edit",
+        params: { id: reservation.id },
+      });
+    };
+
+    const handleLoadReservations = (page = 1) => {
+      loadReservations(page, filters);
+    };
+
+    const cancelReservation = async (reservation) => {
+      await cancelReservationApi(reservation.id, pagination.current_page);
+    };
+
+    const showDetails = (reservation) => {
+      selectedReservation.value = reservation;
+      showDetailModal.value = true;
+    };
+
+    const closeDetail = () => {
+      showDetailModal.value = false;
+      selectedReservation.value = null;
+    };
+
+    const resetFilters = () => {
+      filters.status = "";
+      handleLoadReservations();
+    };
+
+    onMounted(() => {
+      handleLoadReservations();
+    });
+
+    return {
+      filters,
+      headers,
+      statusMap,
+      reservations,
+      pagination,
+      isLoading,
+      handleLoadReservations,
+      cancelReservation,
+      showDetailModal,
+      selectedReservation,
+      goToCreate,
+      goToEdit,
+      showDetails,
+      closeDetail,
+      resetFilters,
+      statusReverseLabel,
+      statusClasses,
+      formatDate,
+      isPdfFile,
+      isImageFile,
+      getFileName,
+    };
   },
 };
 </script>

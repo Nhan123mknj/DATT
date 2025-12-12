@@ -4,8 +4,11 @@ use App\Http\Controllers\Api\Admin\DeviceCategoriesController;
 use App\Http\Controllers\Api\Admin\DeviceController;
 use App\Http\Controllers\Api\Admin\DeviceUnitsController;
 use App\Http\Controllers\Api\Admin\UserController;
+use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Borrower\BorrowsController;
+use App\Http\Controllers\Api\Borrower\DashboardController as BorrowerDashboardController;
 use App\Http\Controllers\Api\Staff\BorrowsController as StaffBorrowsController;
+use App\Http\Controllers\Api\Staff\DashboardController as StaffDashboardController;
 use App\Http\Controllers\Api\Staff\ReservationController as StaffReservationController;
 use App\Http\Controllers\Api\Shared\DeviceController as SharedDeviceController;
 use App\Http\Controllers\Api\Shared\MediaController;
@@ -13,10 +16,21 @@ use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Admin\MenuController;
+use App\Http\Controllers\Api\Admin\ReservationsController;
 use App\Http\Controllers\Api\Borrower\ReservationController;
+use App\Http\Controllers\Api\NotificationController;
+
+
+Route::middleware(['auth:api'])->prefix('notifications')->group(function () {
+    Route::get('/', [NotificationController::class, 'index']);
+    Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/{id}/mark-read', [NotificationController::class, 'markAsRead']);
+    Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+});
 
 Route::prefix('admin')->middleware(['auth:api', 'role:admin'])->group(function () {
-
+    Route::get('dashboard/statistics', [AdminDashboardController::class, 'statistics']);
+    Route::get('reservations', [ReservationsController::class, 'index']);
     Route::get('users', [UserController::class, 'index']);
     Route::post('users', [UserController::class, 'store']);
     Route::get('users/{id}', [UserController::class, 'show']);
@@ -65,13 +79,15 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('menus/{slug}', [MenuController::class, 'getBySlug']);
 });
 
-Route::prefix('borrower')->middleware(['auth:api', 'role:borrower,admin'])->group(function () {
+Route::prefix('borrower')->middleware(['auth:api', 'role:student,teacher,admin'])->group(function () {
+    // Dashboard statistics
+    Route::get('dashboard/statistics', [BorrowerDashboardController::class, 'statistics']);
 
-    // Route::post('borrows', [BorrowsController::class, 'store']);
-
+    Route::apiResource('borrows', BorrowsController::class);
     Route::get('reservations', [ReservationController::class, 'index']);
     Route::post('reservations', [ReservationController::class, 'store']);
     Route::get('reservations/{id}', [ReservationController::class, 'show']);
+    Route::put('reservations/{id}', [ReservationController::class, 'update']);
     Route::post('reservations/{id}/cancel', [ReservationController::class, 'cancel']);
 
     Route::get('device-categories', [SharedDeviceController::class, 'categories']);
@@ -80,6 +96,8 @@ Route::prefix('borrower')->middleware(['auth:api', 'role:borrower,admin'])->grou
 });
 
 Route::prefix('staff')->middleware(['auth:api', 'role:staff,admin'])->group(function () {
+    // Dashboard statistics
+    Route::get('dashboard/statistics', [StaffDashboardController::class, 'statistics']);
 
     Route::get('reservations', [StaffReservationController::class, 'index']);
     Route::get('reservations/statistics', [StaffReservationController::class, 'statistics']);
@@ -91,6 +109,7 @@ Route::prefix('staff')->middleware(['auth:api', 'role:staff,admin'])->group(func
     Route::post('borrows/{id}/approve', [StaffBorrowsController::class, 'approve']);
     Route::post('borrows/{id}/reject', [StaffBorrowsController::class, 'reject']);
     Route::post('borrows/{id}/return', [StaffBorrowsController::class, 'processReturn']);
+    Route::get('users', [App\Http\Controllers\Api\Staff\UserController::class, 'index']);
 });
 
 Route::prefix('auth')->group(function () {

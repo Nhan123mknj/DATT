@@ -106,7 +106,11 @@ export default {
         const result = await authService.login(this.email, this.password);
 
         if (result.success) {
-          this.$router.push({ name: `${result.role}.dashboard` });
+          let routeRole = result.role;
+          if (result.role === "student" || result.role === "teacher") {
+            routeRole = "borrower";
+          }
+          this.$router.push({ name: `${routeRole}.dashboard` });
         } else {
           this.errorMessage = result.error || "Đăng nhập thất bại";
         }

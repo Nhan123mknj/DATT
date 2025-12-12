@@ -7,6 +7,6 @@
   </div>
 </template>
 <script setup>
-import Header from "../components/Header.vue";
+import Header from "../components/ComponentHeader.vue";
 </script>
 <style scoped></style>

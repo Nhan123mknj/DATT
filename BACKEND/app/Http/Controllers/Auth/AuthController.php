@@ -59,9 +59,20 @@ class AuthController extends Controller
 
     public function userProfile()
     {
+        $user = auth('api')->user();
+
+        $user->load('media');
+
+        if ($user->role === 'student') {
+            $user->load('student');
+        } elseif ($user->role === 'teacher') {
+            $user->load('teacher');
+        }
+
         return response()->json([
             'status' => true,
-            'data' =>  auth('api')->user()->load('avatar'),
+            'data' => $user,
+            'avatar_url' => $user->avatar_url ?? null,
         ]);
     }
 
@@ -111,13 +122,13 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Đã xóa avatar']);
     }
-    public function profile()
-    {
-        $user = auth('api')->user()->load('avatar');
+    // public function profile()
+    // {
+    //     $user = auth('api')->user()->load('avatar');
 
-        return response()->json([
-            'user' => $user,
-            'avatar_url' => $user->avatar_url,
-        ]);
-    }
+    //     return response()->json([
+    //         'user' => $user,
+    //         'avatar_url' => $user->avatar_url,
+    //     ]);
+    // }
 }

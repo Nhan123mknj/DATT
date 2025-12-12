@@ -53,7 +53,7 @@
           :options="statusOptions"
           label="Trạng thái"
           nameKey="label"
-          valueKey="value"
+          idKey="value"
         />
         <div class="flex gap-2">
           <Button
@@ -238,7 +238,7 @@ import { devicesService } from "../../../services/devices/devicesService";
 import { deviceCategoriesService } from "../../../services/devices/deviceCategoriesService";
 
 import { useToast } from "vue-toastification";
-import { useDataTable } from "../../../composables/fetchData/useDataTable";
+import { useDevices } from "../../../composables/fetchData/admin/useDevices";
 import { useForm } from "../../../composables/useForm";
 import { useDeviceFilters } from "../../../composables/filter/useDeviceFilter";
 
@@ -271,19 +271,12 @@ export default {
       }
     };
 
-    const {
-      items: devices,
-      isLoading,
-      pagination,
-      loadData,
-      deleteItem,
-    } = useDataTable({
-      fetchData: (params) =>
-        devicesService.list({ ...params, ...buildParams() }),
-      deleteData: (id) => devicesService.remove(id),
-      dataKey: "devices",
-      confirmDeleteMsg: "Bạn chắc chắn muốn xóa thiết bị này?",
-    });
+    const { devices, isLoading, pagination, loadDevices, deleteDevice } =
+      useDevices();
+
+    const handleLoadDevices = (page = 1) => {
+      loadDevices(page, filters);
+    };
 
     const {
       form,
@@ -333,7 +326,7 @@ export default {
         );
 
         toast.success("Đã xóa các thiết bị đã chọn");
-        loadData(pagination.current_page);
+        handleLoadDevices(pagination.current_page);
         selectedDevices.value = [];
       } catch {
         toast.error("Có lỗi khi xóa thiết bị");
@@ -342,11 +335,11 @@ export default {
 
     const handleSearch = (value) => {
       filters.search = value;
-      loadData();
+      handleLoadDevices();
     };
 
     const saveDevice = () => {
-      save(() => loadData(pagination.current_page));
+      save(() => handleLoadDevices(pagination.current_page));
     };
 
     const statusOptions = [
@@ -365,7 +358,7 @@ export default {
 
     onMounted(() => {
       loadCategories();
-      loadData();
+      handleLoadDevices();
     });
 
     return {
@@ -376,8 +369,13 @@ export default {
       devices,
       isLoading,
       pagination,
-      loadData,
-      deleteItem,
+      loadData: handleLoadDevices,
+      deleteItem: async (id) => {
+        const success = await deleteDevice(id);
+        if (success) {
+          handleLoadDevices(pagination.current_page);
+        }
+      },
       form,
       errors,
       showModal,
@@ -392,6 +390,7 @@ export default {
       handleSearch,
       headers,
       statusOptions,
+      exportExcel: () => toast.info("Tính năng đang phát triển"),
     };
   },
 };

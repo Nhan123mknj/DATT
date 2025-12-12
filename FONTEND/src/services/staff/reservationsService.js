@@ -24,4 +24,5 @@ export const reservationsService = {
     createBorrow(id) {
         return apiClient.post(`/staff/reservations/${id}/create-borrow`)
     },
+    
 }

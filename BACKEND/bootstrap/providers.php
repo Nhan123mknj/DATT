@@ -6,4 +6,5 @@ return [
     App\Providers\BorrowServiceProvider::class,
     App\Providers\DeviceServiceProvider::class,
     App\Providers\UserServiceProvider::class,
+    
 ];

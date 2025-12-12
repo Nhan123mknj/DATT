@@ -10,6 +10,9 @@ class UserService
     public function getAllUser($filters = [], $perPage = 10)
     {
         $query = User::query();
+
+        $query->with(['student', 'teacher']);
+
         $query = (new UserFilter($query, $filters))->apply();
 
         if (!isset($filters['order_by'])) {
@@ -24,7 +27,62 @@ class UserService
     }
     public function createUser(array $data)
     {
-        return User::create($data);
+        return \DB::transaction(function () use ($data) {
+            $user = User::create($data);
+
+            // Auto-create student or teacher record with generated code
+            if ($data['role'] === 'student') {
+                $studentCode = $this->generateStudentCode();
+                \App\Models\Student::create([
+                    'user_id' => $user->id,
+                    'student_code' => $studentCode,
+                    'enrollment_date' => now(),
+                ]);
+            } elseif ($data['role'] === 'teacher') {
+                $teacherCode = $this->generateTeacherCode();
+                \App\Models\Teacher::create([
+                    'user_id' => $user->id,
+                    'teacher_code' => $teacherCode,
+                    'hire_date' => now(),
+                ]);
+            }
+
+            return $user->fresh(['student', 'teacher']);
+        });
+    }
+
+    /**
+     * Generate unique student code
+     */
+    private function generateStudentCode(): string
+    {
+        $year = date('Y');
+        $counter = 1;
+
+        do {
+            $code = 'HS' . $year . str_pad($counter, 3, '0', STR_PAD_LEFT);
+            $exists = \DB::table('students')->where('student_code', $code)->exists();
+            $counter++;
+        } while ($exists);
+
+        return $code;
+    }
+
+    /**
+     * Generate unique teacher code
+     */
+    private function generateTeacherCode(): string
+    {
+        $year = date('Y');
+        $counter = 1;
+
+        do {
+            $code = 'GV' . $year . str_pad($counter, 3, '0', STR_PAD_LEFT);
+            $exists = \DB::table('teachers')->where('teacher_code', $code)->exists();
+            $counter++;
+        } while ($exists);
+
+        return $code;
     }
     public function updateUser($id, array $data)
     {

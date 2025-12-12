@@ -38,6 +38,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
         'avatar',
     ];
     protected $appends = ['avatar_url'];
+
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -119,5 +120,81 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
     public function borrows()
     {
         return $this->hasMany(Borrows::class, 'borrower_id');
+    }
+
+    /**
+     * Get the student profile for a student user.
+     */
+    public function student()
+    {
+        return $this->hasOne(Student::class);
+    }
+
+    /**
+     * Get the teacher profile for a teacher user.
+     */
+    public function teacher()
+    {
+        return $this->hasOne(Teacher::class);
+    }
+
+    /**
+     * Check if user is a student
+     */
+    public function isStudent(): bool
+    {
+        return $this->role === 'student';
+    }
+
+    /**
+     * Check if user is a teacher
+     */
+    public function isTeacher(): bool
+    {
+        return $this->role === 'teacher';
+    }
+
+    /**
+     * Check if user is a borrower (student or teacher)
+     */
+    public function isBorrower(): bool
+    {
+        return in_array($this->role, ['student', 'teacher']);
+    }
+
+    /**
+     * Get the user code (student_code or teacher_code)
+     */
+    public function getUserCode(): ?string
+    {
+        if ($this->isStudent()) {
+            return $this->student?->student_code;
+        }
+
+        if ($this->isTeacher()) {
+            return $this->teacher?->teacher_code;
+        }
+
+        return null;
+    }
+
+    /**
+     * Override toArray to exclude null student/teacher relationships
+     */
+    public function toArray()
+    {
+        $array = parent::toArray();
+
+        // Remove student field if user is not a student or if it's null
+        if ($this->role !== 'student' || is_null($this->student)) {
+            unset($array['student']);
+        }
+
+        // Remove teacher field if user is not a teacher or if it's null
+        if ($this->role !== 'teacher' || is_null($this->teacher)) {
+            unset($array['teacher']);
+        }
+
+        return $array;
     }
 }

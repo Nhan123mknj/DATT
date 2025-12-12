@@ -41,7 +41,7 @@ class Media extends Model
             return $this->url;
         }
 
-        return app(CloudinaryService ::class)->getUrl($this->public_id, $width, $height);
+        return app(CloudinaryService::class)->getUrl($this->public_id, $width, $height);
     }
 
     /**

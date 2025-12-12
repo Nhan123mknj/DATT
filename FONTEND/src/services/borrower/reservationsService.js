@@ -1,4 +1,4 @@
-import apiClient from '../../api/apiClient'
+import apiClient from '../api/apiClient'
 
 const buildReservationFormData = (payload) => {
     const formData = new FormData()
@@ -39,7 +39,22 @@ export const reservationsService = {
         })
     },
 
+    update(id, payload) {
+        const data =
+            payload instanceof FormData ? payload : buildReservationFormData(payload)
+        
+        data.append('_method', 'PUT')
+        
+        return apiClient.post(`/borrower/reservations/${id}`, data, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        })
+    },
+
     cancel(id) {
         return apiClient.post(`/borrower/reservations/${id}/cancel`)
     },
+   
+
 }

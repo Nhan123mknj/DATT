@@ -148,7 +148,6 @@
         </div>
       </section>
 
-      <!-- Active Borrows -->
       <section
         class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full"
       >
@@ -218,12 +217,13 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, watch } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import { useToast } from "vue-toastification";
 import { RouterLink } from "vue-router";
 import { reservationsService } from "../../services/borrower/reservationsService";
-import { borrowService } from "../../services/borrower/borrowsService";
+import { borrowService } from "../../services/borrower/borrowService";
 import authService from "../../services/auth/authService";
+import apiClient from "../../services/api/apiClient";
 import { useDataTable } from "../../composables/fetchData/useDataTable";
 import useStatusLabel from "../../composables/utils/statusLabel";
 import useFormatDate from "../../composables/utils/formatDate";
@@ -246,7 +246,20 @@ export default {
       activeBorrows: 0,
     });
 
-    // Reservations
+    const loadStatistics = async () => {
+      try {
+        const response = await apiClient.get("/borrower/dashboard/statistics");
+        if (response.data.success) {
+          const data = response.data.data;
+          stats.totalReservations = data.reservations.total || 0;
+          stats.pendingReservations = data.reservations.pending || 0;
+          stats.activeBorrows = data.borrows.active || 0;
+        }
+      } catch (error) {
+        console.error("Failed to load statistics:", error);
+      }
+    };
+
     const {
       items: recentReservations,
       isLoading: reservationLoading,
@@ -254,7 +267,7 @@ export default {
       pagination: reservationPagination,
     } = useDataTable({
       fetchData: (params) =>
-        reservationsService.listBorrower({
+        reservationsService.list({
           ...params,
           per_page: 5,
         }),
@@ -262,7 +275,6 @@ export default {
       perPage: 5,
     });
 
-    // Borrows
     const {
       items: activeBorrowSlips,
       isLoading: borrowLoading,
@@ -278,27 +290,8 @@ export default {
       perPage: 5,
     });
 
-    // Update stats when data changes
-    watch(reservationPagination, (newVal) => {
-      stats.totalReservations = newVal.total || 0;
-      // Note: This is an approximation based on the fetched page.
-      // Ideally, the backend should provide a stats endpoint or we filter client-side if we fetch all.
-      // For now, we'll count pending in the current page as per original logic,
-      // or we might need a separate call if we want accurate total pending count.
-      // Replicating original logic:
-      stats.pendingReservations = recentReservations.value.filter(
-        (item) => item.status === "pending"
-      ).length;
-    });
-
-    watch(borrowPagination, (newVal) => {
-      // Replicating original logic:
-      stats.activeBorrows = activeBorrowSlips.value.length;
-      // Or better, use total if available:
-      // stats.activeBorrows = newVal.total || 0;
-    });
-
     onMounted(() => {
+      loadStatistics();
       loadReservations();
       loadBorrows();
     });

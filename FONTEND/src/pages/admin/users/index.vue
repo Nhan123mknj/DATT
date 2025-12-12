@@ -21,7 +21,8 @@
           :options="[
             { label: 'Quản trị viên', value: 'admin' },
             { label: 'Nhân viên', value: 'staff' },
-            { label: 'Người dùng', value: 'borrower' },
+            { label: 'Học sinh', value: 'student' },
+            { label: 'Giảng viên', value: 'teacher' },
           ]"
           nameKey="label"
           idKey="value"
@@ -57,9 +58,14 @@
           {{ (pagination.current_page - 1) * pagination.per_page + index + 1 }}
         </template>
         <template #role="{ item }">{{ getRoleLabel(item.role) }}</template>
-        <template #is_active="{ item }">{{
-          statusActive(item.is_active)
-        }}</template>
+        <template #is_active="{ item }">
+          <span
+            class="px-3 py-1 rounded-full text-xs font-medium"
+            :class="statusActiveClass(item.is_active)"
+          >
+            {{ statusActive(item.is_active) }}
+          </span>
+        </template>
         <template #actions="{ item }">
           <button
             @click="viewDetail(item)"
@@ -108,7 +114,7 @@
 
 <script>
 import { ref, onMounted } from "vue";
-import { usersService } from "../../../services/users/usersService";
+import { usersService } from "../../../services/admin/usersService";
 import { useToast } from "vue-toastification";
 import Table from "../../../components/common/Table.vue";
 import Button from "../../../components/common/Button.vue";
@@ -118,9 +124,9 @@ import UpdateUserForm from "../../../components/user/UpdateUserForm.vue";
 import Pagination from "../../../components/common/Pagination.vue";
 import Dropdown from "../../../components/common/Dropdown.vue";
 import SearchBar from "../../../components/common/SearchBar.vue";
-import { useDataTable } from "../../../composables/fetchData/useDataTable";
-import { useUserFilter } from "../../../composables/filter/useUserFilter";
-import { useStatusLabel } from "../../../composables/utils/statusLabel";
+import { useUsers } from "../../../composables/fetchData/admin/useUsers";
+import useUserFilter from "../../../composables/filter/useUserFilter";
+import useStatusLabel from "../../../composables/utils/statusLabel";
 import { useForm } from "../../../composables/useForm";
 
 export default {
@@ -137,30 +143,17 @@ export default {
   },
   setup() {
     const { filters, resetFilters } = useUserFilter();
-    const { statusActive, getRoleLabel } = useStatusLabel();
+    const { statusActive, statusActiveClass, getRoleLabel } = useStatusLabel();
     const toast = useToast();
 
     const selectedUser = ref(null);
     const showDetailModal = ref(false);
 
-    const {
-      items: users,
-      isLoading,
-      pagination,
-      loadData,
-      deleteItem,
-    } = useDataTable({
-      fetchData: (params) =>
-        usersService.getAllUser({
-          ...params,
-          search: filters.search || undefined,
-          role: filters.role || undefined,
-          is_active: filters.is_active || undefined,
-        }),
-      deleteData: (id) => usersService.deleteUser(id),
-      dataKey: null,
-      confirmDeleteMsg: "Bạn có chắc muốn xóa người dùng này?",
-    });
+    const { users, isLoading, pagination, loadUsers, deleteUser } = useUsers();
+
+    const handleLoadUsers = (page = 1) => {
+      loadUsers(page, filters);
+    };
 
     const headers = {
       name: "Tên",
@@ -182,7 +175,7 @@ export default {
 
     const handleSearch = (data) => {
       filters.search = data;
-      loadData();
+      handleLoadUsers();
     };
 
     const viewDetail = async (user) => {
@@ -195,12 +188,13 @@ export default {
       }
     };
 
-    const handleDelete = (user) => {
-      deleteItem(user.id);
+    const handleDelete = async (user) => {
+      const deleted = await deleteUser(user.id);
+      if (deleted) handleLoadUsers(pagination.current_page);
     };
 
     onMounted(() => {
-      loadData();
+      handleLoadUsers();
     });
 
     return {
@@ -211,7 +205,7 @@ export default {
       users,
       isLoading,
       pagination,
-      loadData,
+      loadData: handleLoadUsers,
       handleDelete,
       headers,
       form,
@@ -224,6 +218,7 @@ export default {
       viewDetail,
       selectedUser,
       showDetailModal,
+      statusActiveClass,
     };
   },
 };

@@ -63,7 +63,8 @@
           <option disabled value="">-- Chọn role --</option>
           <option value="admin">Admin</option>
           <option value="staff">Staff</option>
-          <option value="borrower">Người mượn</option>
+          <option value="student">Học sinh</option>
+          <option value="teacher">Giảng viên</option>
         </select>
         <p v-if="errors.role" class="text-sm text-red-600 mt-1">
           {{ errors.role }}
@@ -122,7 +123,7 @@
 
 <script>
 import ModalForm from "../ModalForm.vue";
-import { usersService } from "../../services/users/usersService";
+import { usersService } from "../../services/admin/usersService";
 import { useToast } from "vue-toastification";
 
 export default {
@@ -151,6 +152,7 @@ export default {
   watch: {
     userData: {
       immediate: true,
+      deep: true,
       handler(newUserData) {
         if (newUserData) {
           Object.assign(this.form, {

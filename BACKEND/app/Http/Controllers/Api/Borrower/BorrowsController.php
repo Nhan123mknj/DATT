@@ -23,7 +23,7 @@ class BorrowsController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only(['status']);
-        $perPage = $request->get('page', 15);
+        $perPage = $request->get('per_page', 15);
         $borrowSlip = $this->borrowService->showBorrowingSlip($filters, $perPage);
         if ($borrowSlip->isEmpty()) {
             return response()->json(['message' => 'Không có phiếu mượn nào'], 404);

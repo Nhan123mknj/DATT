@@ -26,6 +26,12 @@ const borrower = [
         meta: { title: 'Tạo đặt trước' },
       },
       {
+        path: 'reservations/:id/edit',
+        name: 'borrower.reservations.edit',
+        component: () => import('../pages/borrower/ReservationCreate.vue'),
+        meta: { title: 'Cập nhật đặt trước' },
+      },
+      {
         path: 'borrows',
         name: 'borrower.borrows',
         component: () => import('../pages/borrower/Borrows.vue'),

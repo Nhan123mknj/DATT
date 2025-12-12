@@ -16,7 +16,7 @@ class BorrowRequest extends FormRequest
     {
 
         $user = auth('api')->user();
-        return $user && $user->role === 'borrower';
+        return $user && in_array($user->role, ['student', 'teacher']);
     }
 
     /**

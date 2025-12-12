@@ -2,10 +2,9 @@
 
 namespace App\Notifications;
 
-use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Notification;
 
 class BorrowNotification extends Notification implements ShouldQueue
@@ -14,13 +13,16 @@ class BorrowNotification extends Notification implements ShouldQueue
 
     public $message;
     public $borrowId;
+    public $type;
+
     /**
      * Create a new notification instance.
      */
-    public function __construct($message, $borrowId)
+    public function __construct($message, $borrowId, $type = 'borrow')
     {
         $this->message = $message;
         $this->borrowId = $borrowId;
+        $this->type = $type;
     }
 
     /**
@@ -30,18 +32,21 @@ class BorrowNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'broadcast'];
+        return ['broadcast']; // Only broadcast, no database
     }
 
     /**
-     * Get the mail representation of the notification.
+     * Get the broadcastable representation of the notification.
      */
-    public function toDatabase($notifiable)
+    public function toBroadcast($notifiable)
     {
-        return [
+        return new BroadcastMessage([
+            'id' => $this->id,
             'message' => $this->message,
             'borrow_id' => $this->borrowId,
-        ];
+            'type' => $this->type,
+            'created_at' => now()->toISOString(),
+        ]);
     }
 
     /**
@@ -54,10 +59,7 @@ class BorrowNotification extends Notification implements ShouldQueue
         return [
             'message' => $this->message,
             'borrow_id' => $this->borrowId,
+            'type' => $this->type,
         ];
-    }
-    public function broadcastOn()
-    {
-        return new PrivateChannel('borrow.' . $this->borrowId);
     }
 }

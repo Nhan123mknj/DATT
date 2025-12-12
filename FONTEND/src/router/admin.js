@@ -55,6 +55,12 @@ const admin = [
         component: () => import('../layout/AccountLayout.vue'),
         meta: { title: 'Tài khoản của tôi' },
       },
+      {
+        path: 'menus',
+        name: 'admin.menus',
+        component: () => import('../pages/admin/MenuManagement.vue'),
+        meta: { title: 'Quản lý Menu' },
+      },
     ],
   },
 ]

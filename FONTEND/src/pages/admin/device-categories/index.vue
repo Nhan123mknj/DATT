@@ -163,7 +163,7 @@ import Pagination from "../../../components/common/Pagination.vue";
 import Modal from "../../../components/Modal.vue";
 import SearchBar from "../../../components/common/SearchBar.vue";
 import { deviceCategoriesService } from "../../../services/devices/deviceCategoriesService";
-import { useDataTable } from "../../../composables/fetchData/useDataTable";
+import { useDeviceCategories } from "../../../composables/fetchData/admin/useDeviceCategories";
 import { useForm } from "../../../composables/useForm";
 export default {
   name: "DeviceCategories",
@@ -181,22 +181,16 @@ export default {
     });
 
     const {
-      items: categories,
+      categories,
       isLoading,
       pagination,
-      loadData,
-      deleteItem,
-    } = useDataTable({
-      fetchData: (params) =>
-        deviceCategoriesService.list({
-          ...params,
-          search: filters.search || undefined,
-          with_devices: true,
-        }),
-      deleteData: (id) => deviceCategoriesService.remove(id),
-      dataKey: "categories",
-      confirmDeleteMsg: "Bạn chắc chắn muốn xóa danh mục này?",
-    });
+      loadCategories,
+      deleteCategory,
+    } = useDeviceCategories();
+
+    const handleLoadCategories = (page = 1) => {
+      loadCategories(page, filters);
+    };
 
     const {
       form,
@@ -234,20 +228,20 @@ export default {
 
     const handleSearch = (data) => {
       filters.search = data;
-      loadData();
+      handleLoadCategories();
     };
 
     const resetFilters = () => {
       filters.search = "";
-      loadData();
+      handleLoadCategories();
     };
 
     const saveCategory = () => {
-      save(() => loadData(pagination.current_page));
+      save(() => handleLoadCategories(pagination.current_page));
     };
 
     onMounted(() => {
-      loadData();
+      handleLoadCategories();
     });
 
     return {
@@ -255,8 +249,13 @@ export default {
       categories,
       isLoading,
       pagination,
-      loadData,
-      deleteItem,
+      loadData: handleLoadCategories,
+      deleteItem: async (id) => {
+        const success = await deleteCategory(id);
+        if (success) {
+          handleLoadCategories(pagination.current_page);
+        }
+      },
       form,
       errors,
       showModal,

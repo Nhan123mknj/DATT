@@ -71,10 +71,8 @@
         </div>
 
         <div class="flex items-center gap-4">
-          <!-- Notification Dropdown -->
           <NotificationDropdown />
 
-          <!-- User Profile -->
           <div class="flex items-center gap-3 pl-4 border-l border-gray-200">
             <div class="text-right hidden md:block">
               <p class="text-sm font-semibold text-gray-900">

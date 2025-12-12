@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\Borrower;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateReservation;
 use App\Models\DeviceReservation;
+use App\Models\User;
 use App\Services\ReservationService;
+use App\Notifications\ReservationCreated;
 use Illuminate\Http\Request;
 
 class ReservationController extends Controller
@@ -21,12 +23,14 @@ class ReservationController extends Controller
     public function index(Request $request)
     {
         $query = DeviceReservation::with([
-            'user:id,name,email',
+            'user:id,name,email,role',
+            'user.student:user_id,student_code,grade_level,class_name',
+            'user.teacher:user_id,teacher_code,department,position',
             'details.deviceUnit.device',
             'approver:id,name'
         ]);
 
-        if (auth('api')->user()->role === 'borrower') {
+        if (in_array(auth('api')->user()->role, ['student', 'teacher'])) {
             $query->where('user_id', auth('api')->id());
         }
 
@@ -59,6 +63,12 @@ class ReservationController extends Controller
         try {
             $reservation = $this->reservationService->createReservation($request->validated());
 
+            // Send notification to all staff
+            $staffUsers = User::whereIn('role', ['staff', 'admin'])->get();
+            foreach ($staffUsers as $staff) {
+                $staff->notify(new ReservationCreated($reservation));
+            }
+
             return response()->json([
                 'message' => 'Đặt trước thiết bị thành công.',
                 'reservation' => $reservation,
@@ -78,12 +88,14 @@ class ReservationController extends Controller
     {
         try {
             $reservation = DeviceReservation::with([
-                'user:id,name,email',
+                'user:id,name,email,role',
+                'user.student:user_id,student_code,grade_level,class_name',
+                'user.teacher:user_id,teacher_code,department,position',
                 'details.deviceUnit.device',
                 'approver:id,name'
             ])->findOrFail($id);
 
-            if (auth('api')->user()->role === 'borrower' && $reservation->user_id !== auth('api')->id()) {
+            if (in_array(auth('api')->user()->role, ['student', 'teacher']) && $reservation->user_id !== auth('api')->id()) {
                 return response()->json([
                     'message' => 'Không có quyền truy cập đặt trước này.'
                 ], 403);
@@ -104,13 +116,18 @@ class ReservationController extends Controller
         try {
             $reservation = DeviceReservation::findOrFail($id);
 
-            if (auth('api')->user()->role === 'borrower' && $reservation->user_id !== auth('api')->id()) {
+            if (in_array(auth('api')->user()->role, ['student', 'teacher']) && $reservation->user_id !== auth('api')->id()) {
                 return response()->json([
                     'message' => 'Không có quyền hủy đặt trước này.'
                 ], 403);
             }
 
             $reservation = $this->reservationService->cancelReservation($id);
+
+            $staffUsers = User::whereIn('role', ['staff', 'admin'])->get();
+            foreach ($staffUsers as $staff) {
+                $staff->notify(new \App\Notifications\ReservationCancelled($reservation));
+            }
 
             return response()->json([
                 'message' => 'Đặt trước đã được hủy.',
@@ -120,6 +137,34 @@ class ReservationController extends Controller
             return response()->json([
                 'message' => 'Đặt trước không tồn tại.'
             ], 404);
+        }
+    }
+    public function update(CreateReservation $request, string $id)
+    {
+        try {
+            $reservation = DeviceReservation::findOrFail($id);
+
+            if (in_array(auth('api')->user()->role, ['student', 'teacher']) && $reservation->user_id !== auth('api')->id()) {
+                return response()->json([
+                    'message' => 'Không có quyền cập nhật đặt trước này.'
+                ], 403);
+            }
+
+            $updatedReservation = $this->reservationService->updateReservation($id, $request->validated());
+
+            return response()->json([
+                'message' => 'Cập nhật đặt trước thành công.',
+                'reservation' => $updatedReservation,
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Đặt trước không tồn tại.'
+            ], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Cập nhật đặt trước thất bại',
+                'error' => $e->getMessage()
+            ], 422);
         }
     }
 }

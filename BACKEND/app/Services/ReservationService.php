@@ -2,12 +2,17 @@
 
 namespace App\Services;
 
+use App\Events\CreateBorrowingSlip;
+use App\Events\ReservationRequestApprove;
+use App\Events\ReservationRequestCancel;
+use App\Events\ReservationRequestCreate;
+use App\Events\ReservationRequestPending;
 use App\Jobs\AutoCreateBorrowJob;
 use App\Models\DeviceReservation;
 use App\Models\DeviceReservationDetail;
 use App\Models\DeviceUnits;
 use App\Models\User;
-use App\Notifications\BorrowNotification;
+
 use App\Services\Borrow\BorrowStrategyFactory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -28,7 +33,7 @@ class ReservationService extends BaseService
             $reservedUntil = $data['reserved_until'];
             $devices = collect($data['devices']);
 
-            // $this->checkUserBorrowLimit($userId);
+            $this->checkUserBorrowLimit($userId);
 
             $deviceUnits = DeviceUnits::whereIn('id', $devices->pluck('device_unit_id'))
                 ->get()
@@ -61,8 +66,6 @@ class ReservationService extends BaseService
                     1;
 
                 $strategy = BorrowStrategyFactory::createStrategy($unit->device);
-                
-                // Only validate, don't process (to avoid double processing and status conflict)
                 $strategy->validateBorrow([
                     'device_id' => $unit->device_id,
                     'device_unit_id' => $unitId,
@@ -70,30 +73,24 @@ class ReservationService extends BaseService
                     'duration' => $duration,
                     'user_id' => $userId,
                 ]);
-                
+
                 DeviceReservationDetail::create([
                     'reservation_id' => $reservation->id,
                     'device_unit_id' => $unitId,
                     'status' => 'pending',
                 ]);
 
-                // Update device status to reserved after validation
                 $unit->update(['status' => 'reserved']);
             }
             DB::afterCommit(function () use ($reservation) {
-                $staffs = User::where('role', 'staff')->get();
-                $message = auth('api')->user()->name . " đã tạo yêu cầu đặt trước #{$reservation->id}";
-
-                foreach ($staffs as $staff) {
-                    $staff->notify(new BorrowNotification($message, $reservation->id));
-                }
+                event(new ReservationRequestCreate($reservation));
             });
 
             return $reservation->load('details.deviceUnit.device');
         });
     }
 
-    public function approveReservation(int $reservationId)
+    public function approveReservation($reservationId)
     {
         $reservation = DeviceReservation::findOrFail($reservationId);
 
@@ -117,33 +114,18 @@ class ReservationService extends BaseService
                 AutoCreateBorrowJob::dispatch($reservation)
                     ->delay($reservation->reserved_from)
                     ->onQueue('reservations');
-
-                \Log::info('✅ Scheduled AutoCreateBorrowJob với delay', [
-                    'reservation_id' => $reservation->id,
-                    'reserved_from' => $reservation->reserved_from,
-                    'delay_seconds' => $reservation->reserved_from->diffInSeconds(now())
-                ]);
             } else {
                 AutoCreateBorrowJob::dispatch($reservation)
                     ->onQueue('reservations');
-
-                \Log::info('✅ Dispatched AutoCreateBorrowJob ngay lập tức', [
-                    'reservation_id' => $reservation->id
-                ]);
             }
 
-            $reservation->user->notify(
-                new BorrowNotification(
-                    "Yêu cầu đặt trước #{$reservation->id} đã được duyệt.",
-                    $reservation->id
-                )
-            );
+            broadcast(new ReservationRequestApprove($reservation));
         });
 
         return $reservation->load('details.deviceUnit.device');
     }
 
-    public function autoCreateBorrowFromReservation(int $reservationId)
+    public function autoCreateBorrowFromReservation($reservationId)
     {
         return $this->runInTransactionWithRetry(function () use ($reservationId) {
             try {
@@ -152,10 +134,6 @@ class ReservationService extends BaseService
                     ->findOrFail($reservationId);
 
                 if ($reservation->status !== 'approved') {
-                    \Log::warning('Cannot auto-create borrow: reservation not approved', [
-                        'reservation_id' => $reservationId,
-                        'status' => $reservation->status
-                    ]);
                     throw ValidationException::withMessages([
                         'status' => 'Không thể tạo phiếu mượn. Reservation chưa được duyệt.'
                     ]);
@@ -174,28 +152,19 @@ class ReservationService extends BaseService
                     'notes' => "Tự động từ đặt trước #{$reservationId}",
                     'commitment_file' => $reservation->commitment_file ?? null,
                     'borrower_id' => $borrowerId,
-                    'from_reservation' => true, // Flag to skip double processing
-                    'auto_approve' => true, // Auto-approve since reservation was approved
+                    'from_reservation' => true,
+                    'auto_approve' => true,
                 ];
 
-                \Log::info('🔄 Auto-creating borrow from reservation', [
-                    'reservation_id' => $reservationId,
-                    'borrower_id' => $borrowerId,
-                    'devices_count' => count($data['devices']),
-                    'has_commitment_file' => !empty($reservation->commitment_file)
-                ]);
-
                 $borrow = $this->borrowService->createBorrowingSlip($data);
+
+
 
                 $reservation->update([
                     'status' => 'completed',
                     'completed_at' => now()
                 ]);
 
-                \Log::info('✅ Auto-created borrow successfully', [
-                    'reservation_id' => $reservationId,
-                    'borrow_id' => $borrow->id
-                ]);
 
                 return $borrow;
             } catch (\Exception $e) {
@@ -209,7 +178,7 @@ class ReservationService extends BaseService
         });
     }
 
-    public function cancelReservation(int $reservationId)
+    public function cancelReservation($reservationId)
     {
         $reservation = DeviceReservation::findOrFail($reservationId);
 
@@ -233,14 +202,80 @@ class ReservationService extends BaseService
                 'cancelled_at' => now()
             ]);
         });
+        broadcast(new ReservationRequestCancel($reservation));
 
         return $reservation;
     }
 
-    private function checkConflict($deviceUnitId, $from, $until)
+    public function updateReservation(int $id, array $data)
+    {
+        return $this->runInTransactionWithRetry(function () use ($id, $data) {
+            $reservation = DeviceReservation::with('details')->findOrFail($id);
+
+            if ($reservation->status !== 'pending') {
+                throw ValidationException::withMessages([
+                    'status' => 'Chỉ có thể cập nhật yêu cầu ở trạng thái chờ duyệt.'
+                ]);
+            }
+
+            $reservedFrom = $data['reserved_from'];
+            $reservedUntil = $data['reserved_until'];
+            $devices = collect($data['devices']);
+            $userId = $reservation->user_id;
+
+            // 1. Release old units
+            foreach ($reservation->details as $detail) {
+                $detail->deviceUnit->update(['status' => 'available']);
+                $detail->delete();
+            }
+
+            // 2. Validate and reserve new units
+            $deviceUnits = DeviceUnits::whereIn('id', $devices->pluck('device_unit_id'))
+                ->get()
+                ->keyBy('id');
+
+            foreach ($devices as $item) {
+                $unitId = $item['device_unit_id'];
+                $unit = $deviceUnits[$unitId] ?? null;
+
+                if (!$unit) {
+                    throw ValidationException::withMessages([
+                        "devices" => "Thiết bị ID $unitId không tồn tại."
+                    ]);
+                }
+
+
+                if ($this->checkConflict($unitId, $reservedFrom, $reservedUntil, $id)) {
+                    throw ValidationException::withMessages([
+                        'devices' => "Thiết bị ID $unitId đã được đặt trong khoảng thời gian này."
+                    ]);
+                }
+
+                DeviceReservationDetail::create([
+                    'reservation_id' => $reservation->id,
+                    'device_unit_id' => $unitId,
+                    'status' => 'pending',
+                ]);
+
+                $unit->update(['status' => 'reserved']);
+            }
+
+            // 3. Update reservation info
+            $reservation->update([
+                'reserved_from' => $reservedFrom,
+                'reserved_until' => $reservedUntil,
+                'notes' => $data['notes'] ?? $reservation->notes,
+                'commitment_file' => $data['commitment_file'] ?? $reservation->commitment_file,
+            ]);
+
+            return $reservation->load('details.deviceUnit.device');
+        });
+    }
+
+    private function checkConflict($deviceUnitId, $from, $until, $excludeReservationId = null)
     {
         return DeviceReservationDetail::where('device_unit_id', $deviceUnitId)
-            ->whereHas('reservation', function ($q) use ($from, $until) {
+            ->whereHas('reservation', function ($q) use ($from, $until, $excludeReservationId) {
                 $q->where(function ($query) use ($from, $until) {
                     $query->whereBetween('reserved_from', [$from, $until])
                         ->orWhereBetween('reserved_until', [$from, $until])
@@ -248,6 +283,10 @@ class ReservationService extends BaseService
                         ->orWhereRaw('? BETWEEN reserved_from AND reserved_until', [$until]);
                 })
                     ->whereNotIn('status', ['cancelled', 'completed', 'rejected']);
+
+                if ($excludeReservationId) {
+                    $q->where('id', '!=', $excludeReservationId);
+                }
             })
             ->exists();
     }

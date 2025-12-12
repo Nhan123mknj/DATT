@@ -222,8 +222,7 @@ import LoadingSkeleton from "../../components/common/LoadingSkeleton.vue";
 import Pagination from "../../components/common/Pagination.vue";
 // import Modal from "../../components/Modal.vue";
 import ModalForm from "../../components/ModalForm.vue";
-import { borrowService } from "../../services/borrower/borrowsService";
-import { useDataTable } from "../../composables/fetchData/useDataTable";
+import { useBorrows } from "../../composables/fetchData/borrower/useBorrows";
 import useStatusLabel from "../../composables/utils/statusLabel";
 import useFormatDate from "../../composables/utils/formatDate";
 
@@ -238,9 +237,9 @@ export default {
     ModalForm,
   },
   setup() {
-    const toast = useToast();
     const { statusReverseLabel, statusClasses } = useStatusLabel();
     const { formatDate } = useFormatDate();
+    const { borrows, pagination, isLoading, loadBorrows } = useBorrows();
 
     const filters = reactive({
       status: "",
@@ -261,21 +260,6 @@ export default {
       returned: "Đã trả",
     };
 
-    const {
-      items: borrows,
-      isLoading,
-      pagination,
-      loadData: loadBorrows,
-    } = useDataTable({
-      fetchData: (params) =>
-        borrowService.list({
-          ...params,
-          status: filters.status ? [filters.status] : undefined,
-        }),
-      dataKey: "borrowSlip",
-      perPage: 10,
-    });
-
     const showDetailModal = ref(false);
     const selectedBorrow = ref(null);
 
@@ -289,13 +273,17 @@ export default {
       selectedBorrow.value = null;
     };
 
+    const handleLoadBorrows = (page = 1) => {
+      loadBorrows(page, filters);
+    };
+
     const resetFilters = () => {
       filters.status = "";
-      loadBorrows();
+      handleLoadBorrows();
     };
 
     onMounted(() => {
-      loadBorrows();
+      handleLoadBorrows();
     });
 
     return {
@@ -305,7 +293,7 @@ export default {
       borrows,
       isLoading,
       pagination,
-      loadBorrows,
+      handleLoadBorrows,
       showDetailModal,
       selectedBorrow,
       openDetail,

@@ -51,7 +51,6 @@ export function useForm(options = {}) {
         resetForm();
 
         Object.assign(form, item);
-        // Ensure reason field is initialized if not present in item
         if (!form.reason) form.reason = '';
         errors.value = {};
         showModal.value = true;

@@ -4,7 +4,9 @@
       class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
     >
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Tạo đặt trước thiết bị</h1>
+        <h1 class="text-2xl font-bold text-gray-900">
+          {{ isEditMode ? "Cập nhật đặt trước" : "Tạo đặt trước thiết bị" }}
+        </h1>
         <p class="text-sm text-gray-500 mt-1">
           Chọn thời gian và thiết bị bạn muốn mượn.
         </p>
@@ -495,22 +497,18 @@
         >
           <Button
             type="button"
-            color="secondary"
+            color="danger"
+            label="Hủy bỏ"
             class="px-6 py-2.5"
             @click="goBack"
-          >
-            Hủy bỏ
-          </Button>
+          />
           <Button
             type="submit"
-            color="primary"
+            :label="isEditMode ? 'Cập nhật' : 'Gửi yêu cầu'"
             class="px-8 py-2.5 shadow-lg shadow-indigo-200"
             :disabled="submitting || totalSelectedDevices === 0"
             :loading="submitting"
-          >
-            <font-awesome-icon icon="paper-plane" class="mr-2" />
-            Gửi yêu cầu
-          </Button>
+          />
         </div>
       </form>
     </div>
@@ -518,7 +516,8 @@
 </template>
 
 <script>
-import { useRouter } from "vue-router";
+import { ref, reactive, computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import Button from "../../components/common/Button.vue";
 import MultiSelect from "../../components/common/MultiSelect.vue";
@@ -557,45 +556,29 @@ export default {
     Button,
     MultiSelect,
   },
-  data() {
-    return {
-      submitting: false,
-      form: {
-        reserved_from: "",
-        reserved_until: "",
-        notes: "",
-        commitment_file: null,
-      },
-      errors: {},
-      categories: [],
-      deviceGroups: [this.createEmptyDeviceGroup()],
-      loadingCategories: false,
-      loadingDevices: false,
-      loadingDeviceUnits: false,
-      deviceTypeGuides: DEVICE_TYPE_GUIDES,
-    };
-  },
-  computed: {
-    categoryOptions() {
-      return this.categories.map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-      }));
-    },
-    totalSelectedDevices() {
-      return this.deviceGroups.reduce((total, group) => {
-        if (group.category_type === "consumable") {
-          return total + (group.quantity || 0);
-        }
-        return total + (group.device_unit_ids?.length || 0);
-      }, 0);
-    },
-  },
-  mounted() {
-    this.loadCategories();
-  },
-  methods: {
-    createEmptyDeviceGroup() {
+  setup() {
+    const router = useRouter();
+    const route = useRoute();
+    const toast = useToast();
+
+    const isEditMode = computed(() => !!route.params.id);
+
+    const submitting = ref(false);
+    const form = reactive({
+      reserved_from: "",
+      reserved_until: "",
+      notes: "",
+      commitment_file: null,
+    });
+    const errors = ref({});
+    const categories = ref([]);
+    const deviceGroups = ref([createEmptyDeviceGroup()]);
+    const loadingCategories = ref(false);
+    const loadingDevices = ref(false);
+    const loadingDeviceUnits = ref(false);
+    const deviceTypeGuides = ref(DEVICE_TYPE_GUIDES);
+
+    function createEmptyDeviceGroup() {
       return {
         category_id: "",
         category_id_array: [],
@@ -607,11 +590,13 @@ export default {
         device_unit_ids: [],
         quantity: 0,
       };
-    },
-    getDeviceTypeLabel(type) {
+    }
+
+    function getDeviceTypeLabel(type) {
       return DEVICE_TYPE_META[type]?.label || "Thiết bị thường";
-    },
-    typeBadgeClass(type) {
+    }
+
+    function typeBadgeClass(type) {
       switch (type) {
         case "expensive":
           return "bg-amber-100 text-amber-700 ring-amber-200";
@@ -620,12 +605,33 @@ export default {
         default:
           return "bg-indigo-100 text-indigo-700 ring-indigo-200";
       }
-    },
-    getSelectedDevicesSummary() {
+    }
+
+    function getDeviceOptions(groupIndex) {
+      const group = deviceGroups.value[groupIndex];
+      if (!group.devices || group.devices.length === 0) return [];
+      return group.devices.map((device) => ({
+        id: device.id,
+        displayName: `${device.name} (${device.model}) - ${device.manufacturer}`,
+      }));
+    }
+
+    function getDeviceUnitOptions(groupIndex) {
+      const group = deviceGroups.value[groupIndex];
+      if (!group.deviceUnits || group.deviceUnits.length === 0) return [];
+      return group.deviceUnits.map((unit) => ({
+        id: unit.id,
+        displayName: unit.serial_number,
+      }));
+    }
+
+    function getSelectedDevicesSummary() {
       const summary = [];
 
-      this.deviceGroups.forEach((group) => {
-        const category = this.categories.find((c) => c.id == group.category_id);
+      deviceGroups.value.forEach((group) => {
+        const category = categories.value.find(
+          (c) => c.id == group.category_id
+        );
         const device = group.devices?.find((d) => d.id == group.device_id);
         if (!category || !device) return;
 
@@ -648,32 +654,18 @@ export default {
       });
 
       return summary;
-    },
-    getDeviceOptions(groupIndex) {
-      const group = this.deviceGroups[groupIndex];
-      if (!group.devices || group.devices.length === 0) return [];
-      return group.devices.map((device) => ({
-        id: device.id,
-        displayName: `${device.name} (${device.model}) - ${device.manufacturer}`,
-      }));
-    },
-    getDeviceUnitOptions(groupIndex) {
-      const group = this.deviceGroups[groupIndex];
-      if (!group.deviceUnits || group.deviceUnits.length === 0) return [];
-      return group.deviceUnits.map((unit) => ({
-        id: unit.id,
-        displayName: unit.serial_number,
-      }));
-    },
-    async onCategorySelect(groupIndex, selectedIds) {
-      const group = this.deviceGroups[groupIndex];
+    }
+
+    // Event handlers
+    async function onCategorySelect(groupIndex, selectedIds) {
+      const group = deviceGroups.value[groupIndex];
       const categoryId =
         selectedIds && selectedIds.length > 0 ? selectedIds[0] : "";
 
       group.category_id = categoryId;
       group.category_id_array = selectedIds || [];
       group.quantity = 0;
-      const category = this.categories.find((c) => c.id == categoryId);
+      const category = categories.value.find((c) => c.id == categoryId);
       group.category_type = category?.type || "";
 
       if (!categoryId) {
@@ -686,7 +678,7 @@ export default {
         return;
       }
 
-      this.loadingDevices = true;
+      loadingDevices.value = true;
       try {
         const { data } = await deviceService.getDevicesByCategory(categoryId);
         group.devices = data.data || [];
@@ -695,13 +687,14 @@ export default {
         group.deviceUnits = [];
         group.device_unit_ids = [];
       } catch (error) {
-        this.toast.error("Không thể tải danh sách thiết bị");
+        toast.error("Không thể tải danh sách thiết bị");
       } finally {
-        this.loadingDevices = false;
+        loadingDevices.value = false;
       }
-    },
-    async onDeviceSelect(groupIndex, selectedIds) {
-      const group = this.deviceGroups[groupIndex];
+    }
+
+    async function onDeviceSelect(groupIndex, selectedIds) {
+      const group = deviceGroups.value[groupIndex];
       const deviceId =
         selectedIds && selectedIds.length > 0 ? selectedIds[0] : "";
 
@@ -715,34 +708,116 @@ export default {
         return;
       }
 
-      this.loadingDeviceUnits = true;
+      loadingDeviceUnits.value = true;
       try {
         const { data } = await deviceService.getDeviceUnitsByDevice(deviceId);
         group.deviceUnits = data.data || [];
         group.device_unit_ids = [];
         group.quantity = 0;
       } catch (error) {
-        this.toast.error("Không thể tải danh sách đơn vị thiết bị");
+        toast.error("Không thể tải danh sách đơn vị thiết bị");
       } finally {
-        this.loadingDeviceUnits = false;
+        loadingDeviceUnits.value = false;
       }
-    },
-    async loadCategories() {
-      this.loadingCategories = true;
+    }
+
+    async function loadCategories() {
+      loadingCategories.value = true;
       try {
         const { data } = await deviceService.getCategories();
-        this.categories = data.data || [];
+        categories.value = data.data || [];
       } catch (error) {
-        this.toast.error("Không thể tải danh sách loại thiết bị");
+        toast.error("Không thể tải danh sách loại thiết bị");
       } finally {
-        this.loadingCategories = false;
+        loadingCategories.value = false;
       }
-    },
-    handleFileChange(event) {
-      this.form.commitment_file = event.target.files?.[0] || null;
-    },
-    handleConsumableQuantity(groupIndex, value) {
-      const group = this.deviceGroups[groupIndex];
+    }
+
+    function formatDateForInput(dateString) {
+      if (!dateString) return "";
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "";
+      const offset = date.getTimezoneOffset() * 60000;
+      const localISOTime = new Date(date.getTime() - offset)
+        .toISOString()
+        .slice(0, 16);
+      return localISOTime;
+    }
+
+    async function loadReservationData() {
+      if (!isEditMode.value) return;
+
+      try {
+        const { data } = await reservationsService.show(route.params.id);
+        const reservation = data.data;
+
+        form.reserved_from = formatDateForInput(reservation.reserved_from);
+        form.reserved_until = formatDateForInput(reservation.reserved_until);
+        form.notes = reservation.notes;
+
+        // Reconstruct device groups
+        const groups = {};
+        reservation.details.forEach((detail) => {
+          const deviceId = detail.device_unit.device_id;
+          if (!groups[deviceId]) {
+            groups[deviceId] = {
+              device: detail.device_unit.device,
+              units: [],
+            };
+          }
+          groups[deviceId].units.push(detail.device_unit);
+        });
+
+        const newGroups = [];
+        for (const deviceId in groups) {
+          const groupData = groups[deviceId];
+          const device = groupData.device;
+          const categoryId = device.category_id;
+
+          const group = createEmptyDeviceGroup();
+          group.category_id = categoryId;
+          group.category_id_array = [categoryId];
+          group.device_id = deviceId;
+          group.device_id_array = [deviceId];
+
+          const { data: devicesData } =
+            await deviceService.getDevicesByCategory(categoryId);
+          group.devices = devicesData.data || [];
+
+          const { data: unitsData } =
+            await deviceService.getDeviceUnitsByDevice(deviceId);
+          group.deviceUnits = unitsData.data || [];
+          group.device_unit_ids = groupData.units.map((u) => u.id);
+
+          newGroups.push(group);
+        }
+
+        deviceGroups.value = newGroups;
+
+        deviceGroups.value.forEach((group) => {
+          const category = categories.value.find(
+            (c) => c.id == group.category_id
+          );
+          if (category) {
+            group.category_type = category.type;
+            if (category.type === "consumable") {
+              group.quantity = group.device_unit_ids.length;
+            }
+          }
+        });
+      } catch (error) {
+        console.error(error);
+        toast.error("Không thể tải thông tin đặt trước");
+        router.push({ name: "borrower.reservations" });
+      }
+    }
+
+    function handleFileChange(event) {
+      form.commitment_file = event.target.files?.[0] || null;
+    }
+
+    function handleConsumableQuantity(groupIndex, value) {
+      const group = deviceGroups.value[groupIndex];
       if (!group) return;
 
       const maxAvailable = group.deviceUnits?.length || 0;
@@ -757,99 +832,165 @@ export default {
         group.deviceUnits?.slice(0, normalizedValue).map((unit) => unit.id) ||
         [];
       group.device_unit_ids = selectedUnits;
-    },
-    async submitReservation() {
-      if (this.submitting) return;
-      this.submitting = true;
-      this.errors = {};
+    }
+
+    async function submitReservation() {
+      if (submitting.value) return;
+      submitting.value = true;
+      errors.value = {};
       try {
-        for (let i = 0; i < this.deviceGroups.length; i++) {
-          const group = this.deviceGroups[i];
+        for (let i = 0; i < deviceGroups.value.length; i++) {
+          const group = deviceGroups.value[i];
           if (!group.category_id) {
-            this.toast.error(
-              `Nhóm thiết bị ${i + 1}: Vui lòng chọn loại thiết bị`
-            );
-            this.submitting = false;
+            toast.error(`Nhóm thiết bị ${i + 1}: Vui lòng chọn loại thiết bị`);
+            submitting.value = false;
             return;
           }
 
           if (!group.device_id) {
-            this.toast.error(`Nhóm thiết bị ${i + 1}: Vui lòng chọn thiết bị`);
-            this.submitting = false;
+            toast.error(`Nhóm thiết bị ${i + 1}: Vui lòng chọn thiết bị`);
+            submitting.value = false;
             return;
           }
 
           if (group.category_type === "consumable") {
             if (!group.quantity || group.quantity < 1) {
-              this.toast.error(
+              toast.error(
                 `Nhóm thiết bị ${i + 1}: Vui lòng nhập số lượng tiêu hao hợp lệ`
               );
-              this.submitting = false;
+              submitting.value = false;
               return;
             }
           } else if (
             !group.device_unit_ids ||
             group.device_unit_ids.length === 0
           ) {
-            this.toast.error(
+            toast.error(
               `Nhóm thiết bị ${
                 i + 1
               }: Vui lòng chọn ít nhất một đơn vị thiết bị`
             );
-            this.submitting = false;
+            submitting.value = false;
             return;
           }
         }
 
-        const allDeviceUnits = this.deviceGroups.flatMap((group) =>
+        const allDeviceUnits = deviceGroups.value.flatMap((group) =>
           (group.device_unit_ids || []).map((unitId) => ({
             device_unit_id: unitId,
           }))
         );
 
         if (!allDeviceUnits.length) {
-          this.toast.error("Vui lòng chọn ít nhất một đơn vị thiết bị");
-          this.submitting = false;
+          toast.error("Vui lòng chọn ít nhất một đơn vị thiết bị");
+          submitting.value = false;
           return;
         }
 
         const payload = {
-          reserved_from: this.form.reserved_from,
-          reserved_until: this.form.reserved_until,
-          notes: this.form.notes,
+          reserved_from: form.reserved_from,
+          reserved_until: form.reserved_until,
+          notes: form.notes,
           devices: allDeviceUnits,
-          commitment_file: this.form.commitment_file,
+          commitment_file: form.commitment_file,
         };
 
-        await reservationsService.createBorrower(payload);
-        this.toast.success("Đã gửi yêu cầu đặt trước");
-        this.router.push({ name: "borrower.reservations" });
-      } catch (error) {
-        if (error.response?.status === 422) {
-          this.errors = error.response.data.errors;
+        if (isEditMode.value) {
+          await reservationsService.update(route.params.id, payload);
+          toast.success("Cập nhật đặt trước thành công");
         } else {
-          this.toast.error("Gửi yêu cầu thất bại");
+          await reservationsService.create(payload);
+          toast.success("Tạo đặt trước thành công");
+        }
+
+        router.push({ name: "borrower.reservations" });
+      } catch (error) {
+        if (error.response && error.response.status === 422) {
+          errors.value = error.response.data.errors || {};
+          toast.error("Vui lòng kiểm tra lại thông tin");
+        } else {
+          toast.error(
+            isEditMode.value
+              ? "Cập nhật đặt trước thất bại"
+              : "Tạo đặt trước thất bại"
+          );
         }
       } finally {
-        this.submitting = false;
+        submitting.value = false;
       }
-    },
-    addDeviceGroup() {
-      this.deviceGroups.push(this.createEmptyDeviceGroup());
-    },
-    removeDeviceGroup(groupIndex) {
-      if (this.deviceGroups.length > 1) {
-        this.deviceGroups.splice(groupIndex, 1);
+    }
+
+    function addDeviceGroup() {
+      deviceGroups.value.push(createEmptyDeviceGroup());
+    }
+
+    function removeDeviceGroup(groupIndex) {
+      if (deviceGroups.value.length > 1) {
+        deviceGroups.value.splice(groupIndex, 1);
       }
-    },
-    goBack() {
-      this.router.push({ name: "borrower.reservations" });
-    },
-  },
-  setup() {
-    const router = useRouter();
-    const toast = useToast();
-    return { router, toast };
+    }
+
+    function goBack() {
+      router.back();
+    }
+
+    // Computed
+    const categoryOptions = computed(() => {
+      return categories.value.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+      }));
+    });
+
+    const totalSelectedDevices = computed(() => {
+      return deviceGroups.value.reduce((total, group) => {
+        if (group.category_type === "consumable") {
+          return total + (group.quantity || 0);
+        }
+        return total + (group.device_unit_ids?.length || 0);
+      }, 0);
+    });
+
+    // Lifecycle
+    onMounted(async () => {
+      await loadCategories();
+      if (isEditMode.value) {
+        await loadReservationData();
+      }
+    });
+
+    return {
+      // State
+      isEditMode,
+      submitting,
+      form,
+      errors,
+      categories,
+      deviceGroups,
+      loadingCategories,
+      loadingDevices,
+      loadingDeviceUnits,
+      deviceTypeGuides,
+      // Computed
+      categoryOptions,
+      totalSelectedDevices,
+      // Methods
+      createEmptyDeviceGroup,
+      getDeviceTypeLabel,
+      typeBadgeClass,
+      getSelectedDevicesSummary,
+      getDeviceOptions,
+      getDeviceUnitOptions,
+      onCategorySelect,
+      onDeviceSelect,
+      loadCategories,
+      handleFileChange,
+      handleConsumableQuantity,
+      submitReservation,
+      addDeviceGroup,
+      removeDeviceGroup,
+      goBack,
+    };
   },
 };
 </script>

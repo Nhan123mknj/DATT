@@ -12,7 +12,7 @@ class CreateReservation extends FormRequest
      */
     public function authorize(): bool
     {
-        return auth("api")->user()->role === 'borrower';
+        return in_array(auth("api")->user()->role, ['student', 'teacher']);
     }
 
     /**
@@ -26,7 +26,7 @@ class CreateReservation extends FormRequest
             'reserved_from' => [
                 'required',
                 'date',
-                'after:now',
+                $this->isMethod('post') ? 'after:now' : '',
             ],
             'reserved_until' => [
                 'required',

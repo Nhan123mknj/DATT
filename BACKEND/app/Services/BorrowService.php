@@ -2,13 +2,16 @@
 
 namespace App\Services;
 
+use App\Events\CreateBorrowingSlip;
+
 use App\Models\Borrows;
 use App\Models\BorrowsDetail;
 use App\Models\DeviceUnits;
 use App\Models\User;
-use App\Services\BaseSevice;
-use App\Notifications\BorrowNotification;
+use App\Services\BaseService;
+
 use App\Services\Borrow\BorrowStrategyFactory;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -18,18 +21,20 @@ class BorrowService extends BaseService
     public function showBorrowingSlip($filters = [], $perPage = 15,)
     {
         $query = Borrows::with([
-            'borrower:id,name,email',
+            'borrower:id,name,email,role',
+            'borrower.student:user_id,student_code,grade_level,class_name',
+            'borrower.teacher:user_id,teacher_code,department,position',
             'details.deviceUnit.device',
         ]);
 
-        if (auth()->user()->role === "borrower") {
+
+        if (in_array(auth()->user()->role, ['student', 'teacher'])) {
             $query->where('borrower_id', auth()->id());
         }
 
         if (isset($filters['status'])) {
             $query->whereIn('status', (array)$filters['status']);
         }
-        // Gate::authorize('view', $query);
         return $query->paginate($perPage);
     }
 
@@ -37,7 +42,6 @@ class BorrowService extends BaseService
     {
         return $this->runInTransactionWithRetry(function () use ($data) {
             try {
-                // Lấy user_id từ data (cho staff), hoặc từ auth (cho borrower)
                 $userId = $data['borrower_id'] ?? auth('api')->user()->id;
                 $expectedReturn = $data['expected_return_date'];
                 $devices = collect($data['devices']);
@@ -50,7 +54,6 @@ class BorrowService extends BaseService
                     ]);
                 }
 
-                // Validate devices trước
                 $deviceUnitIds = $devices->pluck('device_unit_id')->toArray();
                 $deviceUnits = DeviceUnits::with('device')->whereIn('id', $deviceUnitIds)->get()->keyBy('id');
 
@@ -67,7 +70,6 @@ class BorrowService extends BaseService
                         ]);
                     }
 
-                    // Check if device is reserved (only for non-reservation borrows)
                     if (!$fromReservation && $unit->status === 'reserved') {
                         throw ValidationException::withMessages([
                             'devices' => "Thiết bị '{$unit->device->name}' (Unit #{$unitId}) đang được đặt trước cho người khác. Không thể tạo phiếu mượn."
@@ -75,7 +77,7 @@ class BorrowService extends BaseService
                     }
                 }
 
-                // $this->checkUserBorrowLimit($userId);
+                $this->checkUserBorrowLimit($userId);
 
                 $hasExpensive = $deviceUnits->contains(function ($unit) {
                     return $unit->device && $unit->device->category_id == 2;
@@ -86,28 +88,27 @@ class BorrowService extends BaseService
                     ]);
                 }
 
-                // Auto-approve if from approved reservation, otherwise pending
-                $initialStatus = $autoApprove ? 'approved' : 'pending';
+                $initialStatus = $autoApprove ? 'borrowed' : 'pending';
 
                 $borrow = Borrows::create([
                     'borrower_id' => $userId,
+                    'borrowed_date' => now(),
                     'expected_return_date' => $expectedReturn,
                     'status' => $initialStatus,
                     'notes' => $data['notes'] ?? null,
                     'commitment_file' => $data['commitment_file'] ?? null,
                 ]);
 
-                $devices->each(function ($deviceData) use ($borrow, $deviceUnits, $expectedReturn, $userId, $fromReservation) {
+                $devices->each(function ($deviceData) use ($borrow, $deviceUnits, $expectedReturn, $userId, $fromReservation, $autoApprove) {
                     $deviceUnitId = $deviceData['device_unit_id'];
                     $deviceUnit = $deviceUnits[$deviceUnitId];
 
                     $duration = $expectedReturn
-                        ? now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($expectedReturn)->startOfDay()) + 1
+                        ? now()->startOfDay()->diffInDays(Carbon::parse($expectedReturn)->startOfDay()) + 1
                         : 1;
 
                     $strategy = BorrowStrategyFactory::createStrategy($deviceUnit->device);
 
-                    // If from reservation, skip validation and processing (already done)
                     if (!$fromReservation) {
                         $strategy->validateBorrow([
                             'device_id' => $deviceUnit->device_id,
@@ -125,11 +126,16 @@ class BorrowService extends BaseService
                             'user_id' => $userId,
                         ]);
                     } else {
-                        // From reservation: device already reserved, just use default values
                         $result = [
                             'status' => 'pending',
                             'deposit_amount' => 0
                         ];
+                    }
+
+                    if ($autoApprove) {
+                        $result['status'] = 'borrowed';
+                        $deviceUnit->status = 'borrowed';
+                        $deviceUnit->save();
                     }
 
                     BorrowsDetail::create([
@@ -142,11 +148,7 @@ class BorrowService extends BaseService
                 });
 
                 DB::afterCommit(function () use ($borrow) {
-                    $staffUsers = User::where('role', 'staff')->get();
-                    $message = "Phiếu mượn được tạo";
-                    foreach ($staffUsers as $staff) {
-                        $staff->notify(new BorrowNotification($message, $borrow->id));
-                    }
+                    event(new CreateBorrowingSlip($borrow));
                 });
 
                 return $borrow->load('details');
@@ -163,6 +165,7 @@ class BorrowService extends BaseService
     public function getDetailBorrowingSlip($id)
     {
         $result = Borrows::with([
+            'borrower:id,name,email,phone',
             'details:id,borrow_id,device_unit_id',
             'details.deviceUnit:id,device_id,serial_number',
             'details.deviceUnit.device:id,name'
@@ -185,12 +188,14 @@ class BorrowService extends BaseService
                 throw ValidationException::withMessages(['Phiếu không ở trạng thái chờ duyệt.']);
             }
 
+            $this->checkUserBorrowLimit($borrow->borrower_id);
+
             $borrow->status = 'approved';
             $borrow->save();
 
-            DB::afterCommit(function () use ($borrow) {
-                // $borrow->borrower->notify(new BorrowNotification("Phiếu mượn của bạn đã được duyệt."));
-            });
+            // DB::afterCommit(function () use ($borrow) {
+
+            // });
 
             return $borrow->load('details');
         });
@@ -199,12 +204,26 @@ class BorrowService extends BaseService
     public function issueBorrow(int $borrowId)
     {
         return $this->runInTransactionWithRetry(function () use ($borrowId) {
-            $borrow = Borrows::with(['details'])->lockForUpdate()->findOrFail($borrowId);
+            $borrow = Borrows::with(['details', 'borrower'])->lockForUpdate()->findOrFail($borrowId);
 
             Gate::authorize('issue', $borrow);
 
             if (!in_array($borrow->status, ['approved', 'borrowed'], true)) {
                 throw ValidationException::withMessages(['Phieu khong o trang thai co the xuat.']);
+            }
+
+            // Re-check if user is still active before issuing
+            if (!$borrow->borrower->is_active) {
+                throw ValidationException::withMessages([
+                    'user' => 'Tài khoản người mượn đã bị tạm ngừng. Không thể xuất thiết bị.'
+                ]);
+            }
+
+            // Validate expected_return_date is still in the future
+            if ($borrow->expected_return_date && \Carbon\Carbon::parse($borrow->expected_return_date)->isPast()) {
+                throw ValidationException::withMessages([
+                    'expected_return_date' => 'Ngày dự kiến trả đã quá hạn. Vui lòng cập nhật ngày trả mới.'
+                ]);
             }
 
             foreach ($borrow->details as $detail) {
@@ -214,8 +233,11 @@ class BorrowService extends BaseService
                     continue;
                 }
 
-                if ($unit->status !== 'available') {
-                    throw ValidationException::withMessages(["Thiet bi #{$unit->id} khong kha dung."]);
+
+                if (!in_array($unit->status, ['available', 'reserved'])) {
+                    throw ValidationException::withMessages([
+                        "devices" => "Thiết bị #{$unit->id} không khả dụng (status: {$unit->status})."
+                    ]);
                 }
 
                 $unit->status = 'borrowed';
@@ -230,23 +252,35 @@ class BorrowService extends BaseService
             $borrow->save();
 
             DB::afterCommit(function () use ($borrow) {
-                // notify
+                // $borrow->borrower->notify(new BorrowNotification("Phiếu mượn của bạn đã được duyệt."));
             });
 
             return $borrow->load('details.deviceUnit');
         });
     }
 
-    public function createReturnSlip(int $borrowId, array $returnItems)
-    {
-        // $returnItems: [['device_unit_id' => 1, 'condition_at_return' => 'tot']]
-        return $this->runInTransactionWithRetry(function () use ($borrowId, $returnItems) {
-            $borrow = Borrows::with('details')->lockForUpdate()->findOrFail($borrowId);
+    public function createReturnSlip(
+        int $borrowId,
+        array $returnItems,
+        array $signatures = [],
+        ?string $notes = null
+    ) {
+        return $this->runInTransactionWithRetry(function () use (
+            $borrowId,
+            $returnItems,
+            $signatures,
+            $notes
+        ) {
+            $borrow = Borrows::with('details.deviceUnit.device')
+                ->lockForUpdate()
+                ->findOrFail($borrowId);
 
             Gate::authorize('return', $borrow);
 
-            if (!in_array($borrow->status, ['borrowed', 'overdue'], true)) {
-                throw ValidationException::withMessages(['Phieu khong o trang thai co the tra.']);
+            if (!in_array($borrow->status, ['approved', 'borrowed', 'overdue'], true)) {
+                throw ValidationException::withMessages([
+                    'error' => 'Phiếu mượn không ở trạng thái có thể trả.'
+                ]);
             }
 
             $deviceUnitIds = collect($returnItems)->pluck('device_unit_id')->all();
@@ -257,26 +291,7 @@ class BorrowService extends BaseService
                 ->keyBy('device_unit_id');
 
             foreach ($returnItems as $item) {
-                $detail = $details[$item['device_unit_id']] ?? null;
-                if (!$detail || $detail->status !== 'borrowed') {
-                    throw ValidationException::withMessages(["Thiet bi #{$item['device_unit_id']} khong o trang thai dang muon."]);
-                }
-
-                $unit = DeviceUnits::lockForUpdate()->findOrFail($item['device_unit_id']);
-
-                if ($detail->status === 'returned' && $unit->status === 'available') {
-                    continue;
-                }
-
-                $unit->status = 'available';
-                $unit->save();
-
-                $detail->status = 'returned';
-                $detail->returned_at = now();
-                if (!empty($item['condition_at_return'])) {
-                    $detail->condition_at_return = $item['condition_at_return'];
-                }
-                $detail->save();
+                $this->processDeviceReturn($borrow, $item, $details);
             }
 
             $allReturned = !BorrowsDetail::where('borrow_id', $borrowId)
@@ -284,23 +299,138 @@ class BorrowService extends BaseService
                 ->exists();
 
             if ($allReturned) {
+                \Log::info('All items returned. Processing signatures...');
+                if (!empty($signatures['staff'])) {
+                    $path = $this->saveSignatureImage($signatures['staff'], 'staff_signatures');
+                    \Log::info('Staff signature saved at: ' . $path);
+                    $borrow->staff_signature = $path;
+                }
+                if (!empty($signatures['borrower'])) {
+                    $path = $this->saveSignatureImage($signatures['borrower'], 'borrower_signatures');
+                    \Log::info('Borrower signature saved at: ' . $path);
+                    $borrow->borrower_signature = $path;
+                }
+
+                $borrow->return_notes = $notes;
                 $borrow->status = 'returned';
                 $borrow->actual_return_date = now();
+                $borrow->returned_by_staff_id = auth()->id();
                 $borrow->save();
+
+                DB::afterCommit(function () use ($borrow) {
+                    try {
+                        \Log::info('Generating PDF for borrow ' . $borrow->id);
+                        $pdfService = app(\App\Services\ReturnSlipPDFService::class);
+                        $path = $pdfService->generate($borrow);
+                        \Log::info('PDF generated at: ' . $path);
+                    } catch (\Exception $e) {
+                        \Log::error('PDF generation failed: ' . $e->getMessage());
+                        \Log::error($e->getTraceAsString());
+                    }
+                });
             }
 
-            DB::afterCommit(function () use ($borrow) {
-                // notify
-            });
-
-            return $borrow->load('details.deviceUnit');
+            return $borrow->fresh()->load('details.deviceUnit.device');
         });
     }
+
+    /**
+     * Process individual device return
+     */
+    private function processDeviceReturn(Borrows $borrow, array $item, $details)
+    {
+        $detail = $details[$item['device_unit_id']] ?? null;
+
+        if (!$detail || !in_array($detail->status, ['pending', 'borrowed'])) {
+            throw ValidationException::withMessages([
+                'error' => "Thiết bị #{$item['device_unit_id']} không ở trạng thái đang mượn."
+            ]);
+        }
+
+        $unit = DeviceUnits::lockForUpdate()->findOrFail($item['device_unit_id']);
+
+        // Skip if already returned
+        if ($detail->status === 'returned' && $unit->status === 'available') {
+            return;
+        }
+
+        // Check condition & set appropriate status
+        $condition = $item['condition_at_return'];
+
+        if (in_array($condition, ['damaged', 'broken'])) {
+            $unit->status = 'under_maintenance';
+
+            // Calculate damage fee
+            $detail->damage_fee = $this->calculateDamageFee($unit, $condition);
+        } else {
+            $unit->status = 'available';
+        }
+
+        $unit->save();
+
+        // Update detail
+        $detail->status = 'returned';
+        $detail->returned_at = now();
+        $detail->condition_at_return = $condition;
+
+        // Save photos if provided
+        if (!empty($item['photos'])) {
+            $detail->return_photos = json_encode($item['photos']);
+        }
+
+        $detail->save();
+    }
+
+    /**
+     * Calculate damage fee based on condition
+     */
+    private function calculateDamageFee(DeviceUnits $unit, string $condition): float
+    {
+        $baseCost = $unit->device->cost ?? 0;
+
+        return match ($condition) {
+            'damaged' => $baseCost * 0.2,  // 20% for minor damage
+            'broken' => $baseCost * 0.5,   // 50% for major damage
+            default => 0
+        };
+    }
+
     public function rejectBorrowRequest(string $id)
     {
         $borrow = Borrows::findOrFail($id);
         $borrow->status = 'rejected';
         $borrow->save();
         return $borrow;
+    }
+
+    private function saveSignatureImage($base64String, $folder)
+    {
+        if (empty($base64String)) return null;
+
+        $type = 'png'; // Default type
+
+        // Check if it has data URI prefix
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64String, $matches)) {
+            $type = strtolower($matches[1]);
+            $base64String = substr($base64String, strpos($base64String, ',') + 1);
+        }
+
+        if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
+            throw new \Exception('Invalid image type');
+        }
+
+        $decoded = base64_decode($base64String);
+
+        if ($decoded === false) {
+            \Log::error('Base64 decode failed for signature');
+            return null;
+        }
+
+        $fileName = uniqid() . '.' . $type;
+        $path = "signatures/{$folder}/{$fileName}";
+
+        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $decoded);
+
+        return $path;
     }
 }

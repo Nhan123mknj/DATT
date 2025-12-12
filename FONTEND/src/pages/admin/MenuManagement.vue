@@ -19,80 +19,80 @@
       </button>
     </div>
 
-    <!-- Menus Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div
-        v-for="menu in menus"
-        :key="menu.id"
-        class="bg-white rounded-lg shadow border border-gray-200 hover:shadow-lg transition p-5"
-      >
-        <div class="flex items-start justify-between mb-3">
-          <div>
-            <h3 class="font-semibold text-gray-900">{{ menu.name }}</h3>
-            <p class="text-xs text-gray-500 mt-1">{{ menu.slug }}</p>
-          </div>
-          <span
-            v-if="menu.is_active"
-            class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium"
-          >
-            Hoạt động
-          </span>
-          <span
-            v-else
-            class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium"
-          >
-            Tắt
-          </span>
-        </div>
+    <!-- Menus Table -->
+    <Table
+      :data="menus"
+      :headers="tableHeaders"
+      @edit="editMenu"
+      @delete="deleteMenuConfirm"
+    >
+      <template #name="{ item }">
+        <div class="text-sm font-medium text-gray-900">{{ item.name }}</div>
+      </template>
 
-        <p
-          v-if="menu.description"
-          class="text-sm text-gray-600 mb-3 line-clamp-2"
+      <template #slug="{ item }">
+        <span
+          class="px-2 py-1 text-xs font-mono bg-gray-100 text-gray-600 rounded border border-gray-200"
         >
-          {{ menu.description }}
-        </p>
+          {{ item.slug }}
+        </span>
+      </template>
 
-        <div
-          class="flex items-center justify-between text-sm mb-3 pt-3 border-t border-gray-200"
-        >
-          <span class="text-gray-600">
-            {{ menu.items?.length || 0 }} items
-          </span>
+      <template #description="{ item }">
+        <div class="text-sm text-gray-500 line-clamp-1 max-w-xs">
+          {{ item.description || "—" }}
         </div>
+      </template>
 
-        <div class="flex gap-2">
+      <template #status="{ item }">
+        <span
+          v-if="item.is_active"
+          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+        >
+          Hoạt động
+        </span>
+        <span
+          v-else
+          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+        >
+          Tắt
+        </span>
+      </template>
+
+      <template #items="{ item }">
+        <span class="text-sm text-gray-500">{{ item.items?.length || 0 }}</span>
+      </template>
+
+      <template #actions="{ item }">
+        <div class="flex justify-end gap-2">
           <button
-            @click="editMenu(menu)"
-            class="flex-1 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded transition border border-indigo-200"
+            @click="manageItems(item)"
+            class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors text-sm font-medium"
           >
-            <font-awesome-icon icon="edit" class="mr-1" />
-            Sửa
-          </button>
-          <button
-            @click="manageItems(menu)"
-            class="flex-1 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded transition border border-blue-200"
-          >
-            <font-awesome-icon icon="bars" class="mr-1" />
             Items
           </button>
           <button
-            @click="deleteMenuConfirm(menu)"
-            class="flex-1 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition border border-red-200"
+            @click="editMenu(item)"
+            class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors text-sm font-medium"
           >
-            <font-awesome-icon icon="trash" class="mr-1" />
+            Sửa
+          </button>
+          <button
+            @click="deleteMenuConfirm(item)"
+            class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md transition-colors text-sm font-medium"
+          >
             Xóa
           </button>
         </div>
-      </div>
+      </template>
 
-      <div v-if="menus.length === 0" class="col-span-full text-center py-12">
-        <font-awesome-icon
-          icon="inbox"
-          class="text-4xl text-gray-300 mb-3 block"
-        />
-        <p class="text-gray-500 font-medium">Chưa có menu nào</p>
-      </div>
-    </div>
+      <template #empty>
+        <div class="flex flex-col items-center justify-center py-8">
+          <font-awesome-icon icon="inbox" class="text-4xl text-gray-300 mb-3" />
+          <p class="text-gray-500">Chưa có menu nào</p>
+        </div>
+      </template>
+    </Table>
 
     <!-- Menu Form Modal -->
     <ModalForm
@@ -332,209 +332,91 @@
 </template>
 
 <script>
-import { useToast } from "vue-toastification";
+import { onMounted } from "vue";
+import Table from "../../components/common/Table.vue";
 import ModalForm from "../../components/ModalForm.vue";
 import MenuItem from "./MenuItemRow.vue";
-import { menuService } from "../../services/admin/menuService";
+import { useMenu } from "../../composables/fetchData/admin/useMenu";
 
 export default {
   name: "MenuManagement",
   components: {
+    Table,
     ModalForm,
     MenuItem,
   },
-  data() {
-    return {
-      menus: [],
-      currentMenu: null,
-      currentMenuItems: [],
-      editingMenu: null,
-      editingItem: null,
-      loading: false,
-      saving: false,
-      showMenuModal: false,
-      showItemsModal: false,
-      showItemModal: false,
-      menuForm: {
-        name: "",
-        slug: "",
-        description: "",
-        is_active: true,
-        sort_order: 0,
-      },
-      itemForm: {
-        label: "",
-        url: "",
-        icon: "",
-        badge: "",
-        badge_color: "primary",
-        sort_order: 0,
-        is_active: true,
-        parent_id: null,
-        description: "",
-      },
-      errors: {},
-    };
-  },
-  computed: {
-    rootItems() {
-      return this.currentMenuItems.filter((item) => !item.parent_id);
-    },
-  },
-  mounted() {
-    this.loadMenus();
-  },
-  methods: {
-    async loadMenus() {
-      this.loading = true;
-      try {
-        const { data } = await menuService.list();
-        this.menus = data.data || [];
-      } catch (error) {
-        this.toast.error("Lỗi tải menu");
-      } finally {
-        this.loading = false;
-      }
-    },
-    openCreateMenu() {
-      this.editingMenu = null;
-      Object.assign(this.menuForm, {
-        name: "",
-        slug: "",
-        description: "",
-        is_active: true,
-        sort_order: 0,
-      });
-      this.errors = {};
-      this.showMenuModal = true;
-    },
-    editMenu(menu) {
-      this.editingMenu = menu;
-      Object.assign(this.menuForm, menu);
-      this.errors = {};
-      this.showMenuModal = true;
-    },
-    closeMenuModal() {
-      this.showMenuModal = false;
-      this.editingMenu = null;
-    },
-    async saveMenu() {
-      this.saving = true;
-      this.errors = {};
-
-      try {
-        if (this.editingMenu) {
-          await menuService.update(this.editingMenu.id, this.menuForm);
-          this.toast.success("Cập nhật menu thành công");
-        } else {
-          await menuService.create(this.menuForm);
-          this.toast.success("Tạo menu thành công");
-        }
-        this.loadMenus();
-        this.closeMenuModal();
-      } catch (error) {
-        if (error.response?.data?.errors) {
-          this.errors = error.response.data.errors;
-        } else {
-          this.toast.error("Lỗi lưu menu");
-        }
-      } finally {
-        this.saving = false;
-      }
-    },
-    async deleteMenuConfirm(menu) {
-      if (!confirm(`Xóa menu "${menu.name}"?`)) return;
-      try {
-        await menuService.delete(menu.id);
-        this.toast.success("Xóa menu thành công");
-        this.loadMenus();
-      } catch {
-        this.toast.error("Lỗi xóa menu");
-      }
-    },
-    async manageItems(menu) {
-      this.currentMenu = menu;
-      try {
-        const { data } = await menuService.get(menu.id);
-        this.currentMenuItems = data.data.items || [];
-      } catch {
-        this.toast.error("Lỗi tải items");
-      }
-      this.showItemsModal = true;
-    },
-    closeItemsModal() {
-      this.showItemsModal = false;
-      this.currentMenu = null;
-      this.currentMenuItems = [];
-    },
-    openCreateItem() {
-      this.editingItem = null;
-      Object.assign(this.itemForm, {
-        menu_id: this.currentMenu.id,
-        label: "",
-        url: "",
-        icon: "",
-        badge: "",
-        badge_color: "primary",
-        sort_order: 0,
-        is_active: true,
-        parent_id: null,
-        description: "",
-      });
-      this.errors = {};
-      this.showItemModal = true;
-    },
-    editItem(item) {
-      this.editingItem = item;
-      Object.assign(this.itemForm, {
-        ...item,
-        menu_id: this.currentMenu.id,
-      });
-      this.errors = {};
-      this.showItemModal = true;
-    },
-    closeItemModal() {
-      this.showItemModal = false;
-      this.editingItem = null;
-    },
-    async saveItem() {
-      this.saving = true;
-      this.errors = {};
-
-      try {
-        if (this.editingItem) {
-          await menuService.updateItem(this.editingItem.id, this.itemForm);
-          this.toast.success("Cập nhật item thành công");
-        } else {
-          await menuService.createItem(this.itemForm);
-          this.toast.success("Tạo item thành công");
-        }
-        this.manageItems(this.currentMenu);
-        this.closeItemModal();
-      } catch (error) {
-        if (error.response?.data?.errors) {
-          this.errors = error.response.data.errors;
-        } else {
-          this.toast.error("Lỗi lưu item");
-        }
-      } finally {
-        this.saving = false;
-      }
-    },
-    async deleteItemConfirm(item) {
-      if (!confirm(`Xóa item "${item.label}"?`)) return;
-      try {
-        await menuService.deleteItem(item.id);
-        this.toast.success("Xóa item thành công");
-        this.manageItems(this.currentMenu);
-      } catch {
-        this.toast.error("Lỗi xóa item");
-      }
-    },
-  },
   setup() {
-    const toast = useToast();
-    return { toast };
+    const {
+      menus,
+      currentMenu,
+      currentMenuItems,
+      editingMenu,
+      editingItem,
+      loading,
+      saving,
+      showMenuModal,
+      showItemsModal,
+      showItemModal,
+      menuForm,
+      itemForm,
+      errors,
+      rootItems,
+      loadMenus,
+      openCreateMenu,
+      editMenu,
+      closeMenuModal,
+      saveMenu,
+      deleteMenuConfirm,
+      manageItems,
+      closeItemsModal,
+      openCreateItem,
+      editItem,
+      closeItemModal,
+      saveItem,
+      deleteItemConfirm,
+    } = useMenu();
+
+    const tableHeaders = {
+      name: "Tên Menu",
+      slug: "Slug",
+      description: "Mô tả",
+      status: "Trạng thái",
+      items: "Items",
+    };
+
+    onMounted(() => {
+      loadMenus();
+    });
+
+    return {
+      menus,
+      tableHeaders,
+      currentMenu,
+      currentMenuItems,
+      editingMenu,
+      editingItem,
+      loading,
+      saving,
+      showMenuModal,
+      showItemsModal,
+      showItemModal,
+      menuForm,
+      itemForm,
+      errors,
+      rootItems,
+      openCreateMenu,
+      editMenu,
+      closeMenuModal,
+      saveMenu,
+      deleteMenuConfirm,
+      manageItems,
+      closeItemsModal,
+      openCreateItem,
+      editItem,
+      closeItemModal,
+      saveItem,
+      deleteItemConfirm,
+    };
   },
 };
 </script>

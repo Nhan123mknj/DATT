@@ -200,7 +200,7 @@ import SearchBar from "../../../components/common/SearchBar.vue";
 import Dropdown from "../../../components/common/Dropdown.vue";
 import { deviceUnitsService } from "../../../services/devices/deviceUnitsService";
 import { devicesService } from "../../../services/devices/devicesService";
-import { useDataTable } from "../../../composables/fetchData/useDataTable";
+import { useDeviceUnits } from "../../../composables/fetchData/admin/useDeviceUnits";
 import { useForm } from "../../../composables/useForm";
 export default {
   name: "DeviceUnits",
@@ -223,23 +223,16 @@ export default {
     const devices = ref([]);
 
     const {
-      items: units,
+      deviceUnits,
       isLoading,
       pagination,
-      loadData,
-      deleteItem,
-    } = useDataTable({
-      fetchData: (params) =>
-        deviceUnitsService.list({
-          ...params,
-          search: filters.search || undefined,
-          device_id: filters.device_id || undefined,
-          status: filters.status || undefined,
-        }),
-      deleteData: (id) => deviceUnitsService.remove(id),
-      dataKey: null,
-      confirmDeleteMsg: "Bạn chắc chắn muốn xóa đơn vị này?",
-    });
+      loadDeviceUnits,
+      deleteDeviceUnit,
+    } = useDeviceUnits();
+
+    const handleLoadUnits = (page = 1) => {
+      loadDeviceUnits(page, filters);
+    };
 
     const {
       form,
@@ -296,18 +289,18 @@ export default {
 
     const handleSearch = (data) => {
       filters.search = data;
-      loadData();
+      handleLoadUnits();
     };
 
     const resetFilters = () => {
       filters.search = "";
       filters.device_id = "";
       filters.status = "";
-      loadData();
+      loadDeviceUnits();
     };
 
     const saveUnit = () => {
-      save(() => loadData(pagination.current_page));
+      save(() => handleLoadUnits(pagination.current_page));
     };
 
     const statusLabel = (status) => {
@@ -333,16 +326,21 @@ export default {
 
     onMounted(() => {
       loadDevices();
-      loadData();
+      handleLoadUnits();
     });
 
     return {
       filters,
-      devices,
+      units: deviceUnits,
       isLoading,
       pagination,
-      loadData,
-      deleteItem,
+      loadData: handleLoadUnits,
+      deleteItem: async (id) => {
+        const success = await deleteDeviceUnit(id);
+        if (success) {
+          handleLoadUnits(pagination.current_page);
+        }
+      },
       form,
       errors,
       showModal,
@@ -358,6 +356,8 @@ export default {
       saveUnit,
       statusLabel,
       statusClass,
+      devices,
+      statusOptions,
     };
   },
 };

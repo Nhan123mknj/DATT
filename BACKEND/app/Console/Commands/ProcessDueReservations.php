@@ -30,7 +30,6 @@ class ProcessDueReservations extends Command
         $count = 0;
         foreach ($missedReservations as $reservation) {
             try {
-                // Chỉ dispatch nếu chưa tạo phiếu mượn
                 if (!$this->borrowExists($reservation->id)) {
                     AutoCreateBorrowJob::dispatch($reservation)
                         ->onQueue('reservations');
@@ -51,7 +50,6 @@ class ProcessDueReservations extends Command
 
     private function borrowExists(int $reservationId): bool
     {
-        // Check in Borrows table, not BorrowsDetail
         return \App\Models\Borrows::where('notes', 'like', "%đặt trước #{$reservationId}%")
             ->exists();
     }

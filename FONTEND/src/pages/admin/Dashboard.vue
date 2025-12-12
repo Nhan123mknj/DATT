@@ -159,15 +159,14 @@
 </template>
 
 <script>
-import { reactive, onMounted } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import { useToast } from "vue-toastification";
 import { RouterLink } from "vue-router";
 import StatCard from "../../components/common/StatCard.vue";
-import { usersService } from "../../services/users/usersService";
+import { usersService } from "../../services/admin/usersService";
 import { deviceCategoriesService } from "../../services/devices/deviceCategoriesService";
 import { devicesService } from "../../services/devices/devicesService";
-import { reservationsService } from "../../services/reservations/reservationsService";
-import { useDataTable } from "../../composables/fetchData/useDataTable";
+import { reservationsService } from "../../services/admin/reservationsSevice";
 import useStatusLabel from "../../composables/utils/statusLabel";
 import useFormatDate from "../../composables/utils/formatDate";
 export default {
@@ -178,7 +177,7 @@ export default {
   },
   setup() {
     const toast = useToast();
-    const { statusReverse, statusClasses } = useStatusLabel();
+    const { statusReverseLabel, statusClasses } = useStatusLabel();
     const { formatDate } = useFormatDate();
     const stats = reactive({
       users: 0,
@@ -214,19 +213,24 @@ export default {
       },
     ];
 
-    const {
-      items: recentReservations,
-      isLoading: reservationsLoading,
-      loadData: loadReservations,
-    } = useDataTable({
-      fetchData: (params) =>
-        reservationsService.listStaff({
-          ...params,
+    const recentReservations = ref([]);
+    const reservationsLoading = ref(false);
+
+    const loadReservations = async () => {
+      reservationsLoading.value = true;
+      try {
+        const { data } = await reservationsService.getReservations({
           per_page: 5,
-        }),
-      dataKey: "data",
-      perPage: 5,
-    });
+        });
+        // console.log(data.data);
+        recentReservations.value = data.data?.data || [];
+        // console.log(recentReservations.value);
+      } catch (error) {
+        console.error("Load reservations error:", error);
+      } finally {
+        reservationsLoading.value = false;
+      }
+    };
 
     const fetchStats = async () => {
       try {
@@ -235,7 +239,10 @@ export default {
             usersService.getAllUser({ page: 1 }),
             deviceCategoriesService.list({ page: 1 }),
             devicesService.list({ page: 1 }),
-            reservationsService.listStaff({ status: ["pending"], per_page: 1 }),
+            reservationsService.getReservations({
+              status: ["pending"],
+              per_page: 1,
+            }),
           ]);
 
         const getTotal = (res, path) => {
@@ -264,7 +271,7 @@ export default {
       recentReservations,
       reservationsLoading,
       formatDate,
-      statusLabel: statusReverse,
+      statusLabel: statusReverseLabel,
       statusClasses,
     };
   },

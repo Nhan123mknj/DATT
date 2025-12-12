@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\Staff;
 use App\Http\Controllers\Controller;
 use App\Services\ReservationService;
 use App\Models\DeviceReservation;
+use App\Notifications\ReservationApproved;
+use App\Notifications\ReservationRejected;
 use Illuminate\Http\Request;
 
 class ReservationController extends Controller
@@ -21,7 +23,9 @@ class ReservationController extends Controller
     public function index(Request $request)
     {
         $query = DeviceReservation::with([
-            'user:id,name,email',
+            'user:id,name,email,role',
+            'user.student:user_id,student_code,grade_level,class_name',
+            'user.teacher:user_id,teacher_code,department,position',
             'details.deviceUnit.device',
             'approver:id,name'
         ]);
@@ -80,8 +84,13 @@ class ReservationController extends Controller
     public function show($id)
     {
         try {
-            $reservation = DeviceReservation::with('user', 'details.deviceUnit.device', 'approvedBy')
-                ->findOrFail($id);
+            $reservation = DeviceReservation::with([
+                'user:id,name,email,role',
+                'user.student:user_id,student_code,grade_level,class_name',
+                'user.teacher:user_id,teacher_code,department,position',
+                'details.deviceUnit.device',
+                'approvedBy'
+            ])->findOrFail($id);
 
             return response()->json([
                 'data' => $reservation
@@ -108,6 +117,9 @@ class ReservationController extends Controller
             }
 
             $reservation = $this->reservationService->approveReservation($id);
+
+            // Send notification to borrower
+            $reservation->user->notify(new ReservationApproved($reservation));
 
             return response()->json([
                 'message' => 'Đã duyệt đặt trước. Hệ thống sẽ tự động tạo phiếu mượn khi đến thời gian.',
@@ -161,15 +173,8 @@ class ReservationController extends Controller
                 ]);
             });
 
-            // Notify user
-            \DB::afterCommit(function () use ($reservation) {
-                $reservation->user->notify(
-                    new \App\Notifications\BorrowNotification(
-                        "Đặt trước #{$reservation->id} đã bị từ chối: {$reservation->rejection_reason}",
-                        $reservation->id
-                    )
-                );
-            });
+            // Send notification to borrower
+            $reservation->user->notify(new ReservationRejected($reservation, $request->reason));
 
             return response()->json([
                 'message' => 'Đã từ chối đặt trước',

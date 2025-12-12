@@ -123,6 +123,7 @@
 <script>
 import { RouterLink } from "vue-router";
 import apiClient from "../../services/api/apiClient";
+import authService from "../../services/auth/authService";
 
 export default {
   name: "SideBar",
@@ -190,7 +191,24 @@ export default {
         };
 
         const tree = buildTree(rootItems);
-        this.menuItems = this.transformItems(tree);
+        let finalItems = this.transformItems(tree);
+
+        // Add Admin Menu Management link if admin
+        const currentUser = authService.getUser();
+        if (currentUser?.role === "admin") {
+          const exists = finalItems.find((i) => i.url === "/admin/menus");
+          if (!exists) {
+            finalItems.push({
+              id: "admin-menu-management",
+              label: "Quản lý Menu",
+              url: "/admin/menus",
+              icon: "fas fa-bars",
+              children: [],
+            });
+          }
+        }
+
+        this.menuItems = finalItems;
         this.expandActiveParents();
       } catch (e) {
         console.error("❌ Sidebar menu error:", e);

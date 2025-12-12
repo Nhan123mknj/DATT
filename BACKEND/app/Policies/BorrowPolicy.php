@@ -22,7 +22,7 @@ class BorrowPolicy
             return false;
         }
 
-        if ($user->role === 'borrower') {
+        if (in_array($user->role, ['student', 'teacher'])) {
             return true;
         }
         return in_array($user->role, ['admin', 'staff']);
@@ -37,7 +37,7 @@ class BorrowPolicy
             return false;
         }
 
-        if ($user->role === 'borrower') {
+        if (in_array($user->role, ['student', 'teacher'])) {
             return $borrows->borrower_id === $user->id;
         }
         return in_array($user->role, ['admin', 'staff']);
@@ -75,7 +75,7 @@ class BorrowPolicy
      */
     public function update(User $user, Borrows $borrows): bool
     {
-        if ($user->role === 'borrower') {
+        if (in_array($user->role, ['student', 'teacher'])) {
             return $borrows->borrower_id === $user->id;
         }
         return false;
@@ -103,5 +103,20 @@ class BorrowPolicy
     public function forceDelete(User $user, Borrows $borrows): bool
     {
         return false;
+    }
+
+    public function approve(User $user, Borrows $borrows): bool
+    {
+        return in_array($user->role, ['admin', 'staff']) && $this->isActive($user);
+    }
+
+    public function issue(User $user, Borrows $borrows): bool
+    {
+        return in_array($user->role, ['admin', 'staff']) && $this->isActive($user);
+    }
+
+    public function return(User $user, Borrows $borrows): bool
+    {
+        return in_array($user->role, ['admin', 'staff']) && $this->isActive($user);
     }
 }

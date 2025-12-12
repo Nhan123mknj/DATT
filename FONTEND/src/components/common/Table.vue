@@ -45,7 +45,7 @@
           </td>
           <td v-for="(header, key) in headers" :key="key" class="px-6 py-4">
             <slot :name="key" :item="item" :index="index">
-              {{ item[key] }}
+              #{{ item[key] }}
             </slot>
           </td>
 

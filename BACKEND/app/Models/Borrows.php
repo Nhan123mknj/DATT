@@ -19,7 +19,13 @@ class Borrows extends Model
         'actual_return_date',
         'status',
         'notes',
-        'commitment_file'
+        'commitment_file',
+        'staff_signature',
+        'borrower_signature',
+        'return_notes',
+        'returned_by_staff_id',
+        'return_slip_pdf_path',
+        'return_slip_generated_at'
     ];
 
     public function borrower()
@@ -30,5 +36,10 @@ class Borrows extends Model
     public function details()
     {
         return $this->hasMany(BorrowsDetail::class, 'borrow_id');
+    }
+
+    public function returnedByStaff()
+    {
+        return $this->belongsTo(User::class, 'returned_by_staff_id');
     }
 }
