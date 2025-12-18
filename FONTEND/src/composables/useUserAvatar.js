@@ -1,10 +1,11 @@
 import { ref, computed, onBeforeUnmount } from 'vue';
 import { useToast } from 'vue-toastification';
 import { profileService } from '../services/auth/profileService';
-import authService from '../services/auth/authService';
+import { useAuthStore } from '../stores/authStore';
 
 export function useUserAvatar(user) {
   const toast = useToast();
+  const authStore = useAuthStore();
 
   const avatarPreview = ref('');
   const avatarUploading = ref(false);
@@ -41,6 +42,11 @@ export function useUserAvatar(user) {
       }
       if (responseData.user) {
         user.value = { ...user.value, ...responseData.user };
+      }
+      
+      // Persist to store
+      if (authStore.updateUser) {
+        authStore.updateUser(user.value);
       }
 
       toast.success('Ảnh đại diện đã được cập nhật');

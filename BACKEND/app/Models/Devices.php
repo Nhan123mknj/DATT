@@ -25,6 +25,11 @@ class Devices extends Model
         'quantity',
     ];
 
+    protected $casts = [
+        'is_active' => 'boolean',
+        'specifications' => 'array',
+    ];
+
     public function category()
     {
         return $this->belongsTo(CategoriesDevice::class, 'category_id');
@@ -58,9 +63,5 @@ class Devices extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
-    }
-    public function getAvailableUnitsAttribute()
-    {
-        return $this->units()->where('status', 'available')->count();
     }
 }

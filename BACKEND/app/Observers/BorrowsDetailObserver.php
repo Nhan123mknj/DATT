@@ -12,8 +12,8 @@ class BorrowsDetailObserver
      */
     public function created(BorrowsDetail $borrowsDetail): void
     {
-        DeviceUnits::where('id', $borrowsDetail->device_unit_id)
-            ->update(['status' => 'available']);
+        // DeviceUnits::where('id', $borrowsDetail->device_unit_id)
+        //     ->update(['status' => 'available']);
     }
 
     /**

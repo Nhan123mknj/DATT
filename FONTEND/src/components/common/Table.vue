@@ -40,12 +40,12 @@
           </td>
           <td class="px-6 py-4 text-center text-gray-700 font-medium">
             <slot name="STT" :index="index" :item="item">
-              {{ index + 1 }}
+              #{{ index + 1 }}
             </slot>
           </td>
           <td v-for="(header, key) in headers" :key="key" class="px-6 py-4">
             <slot :name="key" :item="item" :index="index">
-              #{{ item[key] }}
+              {{ item[key] }}
             </slot>
           </td>
 

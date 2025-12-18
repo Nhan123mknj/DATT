@@ -1,4 +1,4 @@
-import authService from '../services/auth/authService.js'
+import { useAuthStore } from '../stores/authStore'
 
 // Track if we've already verified token in this session
 let tokenVerified = false
@@ -6,25 +6,26 @@ let tokenVerified = false
 // Function to reset verification flag (for logout)
 export const resetTokenVerification = () => {
   tokenVerified = false
-
 }
 
-// Make it available globally for authService
+// Make it available globally if needed, though store handles logout now
 if (typeof window !== 'undefined') {
   window.resetTokenVerification = resetTokenVerification
 }
 
 export const requireAuth = async (to, from, next) => {
+  const authStore = useAuthStore()
   
-  if (!authService.isAuthenticated()) {
+  if (!authStore.isAuthenticated) {
     tokenVerified = false 
-    next({ name: 'login' })
+    next({ 
+      name: 'login',
+      query: { redirect: to.fullPath }
+    })
     return
   }
 
-
   if (from.name === 'login') {
-
     tokenVerified = true 
     next()
     return
@@ -35,13 +36,15 @@ export const requireAuth = async (to, from, next) => {
     return
   }
 
-  const isValid = await authService.verifyToken()
+  const isValid = await authStore.verifyToken()
   if (!isValid) {
     tokenVerified = false
-    next({ name: 'login' })
+    next({ 
+      name: 'login',
+      query: { redirect: to.fullPath }
+    })
     return
   }
-
   
   try {
     const { useNotifications } = await import('../stores/notificationStore')
@@ -57,7 +60,8 @@ export const requireAuth = async (to, from, next) => {
 // Route guard to check user role
 export const requireRole = (role) => {
   return (to, from, next) => {
-    const user = authService.getUser();
+    const authStore = useAuthStore()
+    const user = authStore.user;
     // Map student/teacher to borrower for route checking
     const userRole = (user?.role === 'student' || user?.role === 'teacher') ? 'borrower' : user?.role;
     
@@ -90,8 +94,9 @@ export const requireRole = (role) => {
 
 
 export const redirectIfAuthenticated = (to, from, next) => {
-  if (authService.isAuthenticated()) {
-    const user = authService.getUser();
+  const authStore = useAuthStore()
+  if (authStore.isAuthenticated) {
+    const user = authStore.user;
 
     let targetRoute;
     switch (user?.role) {

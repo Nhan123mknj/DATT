@@ -24,3 +24,18 @@ Schedule::command('reservations:cancel-pending', ['--hours' => 24])
     ->onFailure(function () {
         \Log::error('❌ Auto-cancel command failed');
     });
+
+Schedule::command('borrows:update-overdue')
+    ->daily()
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping();
+
+Schedule::command('app:notify-upcoming-return')
+    ->dailyAt('08:00')
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping();
+
+Schedule::command('borrows:cancel-abandoned')
+    ->dailyAt('23:00')
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping();

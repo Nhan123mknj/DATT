@@ -106,11 +106,22 @@
       </div>
     </div>
 
-    <!-- Detail Modal -->
     <ReservationDetailModal
       :show="showDetailModal"
       :reservation="selectedReservation"
       @close="closeDetail"
+      @approve="
+        (item) => {
+          closeDetail();
+          approveReservation(item.id);
+        }
+      "
+      @reject="
+        (item) => {
+          closeDetail();
+          openRejectModal(item);
+        }
+      "
     />
 
     <!-- Reject Modal -->
@@ -146,6 +157,7 @@ import useFormatDate from "../../composables/utils/formatDate";
 import ReservationDetailModal from "../../components/staff/reservation/ReservationDetailModal.vue";
 import ReservationRejectModal from "../../components/staff/reservation/ReservationRejectModal.vue";
 import ReservationCreateBorrowModal from "../../components/staff/reservation/ReservationCreateBorrowModal.vue";
+import { useDeviceUnitStore } from "../../stores/deviceUnitStore";
 
 export default {
   name: "StaffReservations",
@@ -247,6 +259,8 @@ export default {
       borrowLoading.value = false;
     };
 
+    const deviceUnitStore = useDeviceUnitStore();
+
     const submitCreateBorrow = async () => {
       if (!selectedReservationForBorrow.value) return;
 
@@ -258,6 +272,10 @@ export default {
       borrowLoading.value = false;
       if (success) {
         closeCreateBorrowModal();
+        // Refresh device units if store is active
+        if (deviceUnitStore.units.length > 0) {
+          deviceUnitStore.fetchUnits(deviceUnitStore.pagination.current_page);
+        }
       }
     };
 

@@ -68,7 +68,6 @@
 </template>
 
 <script setup>
-import { user } from "../../services/auth/authService";
 const props = defineProps({
   lastLoginDate: String,
   activeTab: String,

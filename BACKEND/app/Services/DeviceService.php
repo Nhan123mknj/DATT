@@ -13,7 +13,16 @@ class DeviceService
 {
     public function listDevices($filters = [], $perPage = 15)
     {
-        $query = Devices::with('category', 'units');
+        $query = Devices::with('category', 'units')
+            ->withCount(['units as units_in_use_count' => function ($query) {
+                $query->where('status', 'borrowed');
+            }])
+            ->withCount(['units as units_reserved_count' => function ($query) {
+                $query->where('status', 'reserved');
+            }])
+            ->withCount(['units as units_maintenance_count' => function ($query) {
+                $query->where('status', 'under_maintenance');
+            }]);
 
         $allowSortFields = [
             'id' => 'id',
@@ -34,7 +43,7 @@ class DeviceService
         if (isset($filters['is_active'])) {
             $query->where('is_active', $filters['is_active']);
         }
-        
+
         if (isset($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
@@ -54,6 +63,7 @@ class DeviceService
     {
         return Devices::create($data);
     }
+
     public function updateDevice($id, $data)
     {
         $device = Devices::findOrFail($id);

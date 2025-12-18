@@ -20,12 +20,13 @@ import 'flowbite';
 /* add icons to the library */
 library.add(fas)
 
+import { createPinia } from 'pinia'
+
 const app = createApp(App)
 
-// Setup router
 app.use(router)
 
-// Setup toastification
+app.use(createPinia())
 app.use(Toast, {
   transition: "Vue-Toastification__bounce",
   maxToasts: 20,

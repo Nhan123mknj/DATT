@@ -60,25 +60,17 @@ class ReservationController extends Controller
      */
     public function store(CreateReservation $request)
     {
-        try {
-            $reservation = $this->reservationService->createReservation($request->validated());
+        $reservation = $this->reservationService->createReservation($request->validated());
 
-            // Send notification to all staff
-            $staffUsers = User::whereIn('role', ['staff', 'admin'])->get();
-            foreach ($staffUsers as $staff) {
-                $staff->notify(new ReservationCreated($reservation));
-            }
-
-            return response()->json([
-                'message' => 'Đặt trước thiết bị thành công.',
-                'reservation' => $reservation,
-            ], 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Tạo đặt trước thất bại',
-                'error' => $e->getMessage()
-            ], 500);
+        $staffUsers = User::whereIn('role', ['staff', 'admin'])->get();
+        foreach ($staffUsers as $staff) {
+            $staff->notify(new ReservationCreated($reservation));
         }
+
+        return response()->json([
+            'message' => 'Đặt trước thiết bị thành công.',
+            'reservation' => $reservation,
+        ], 201);
     }
 
     /**
@@ -100,7 +92,10 @@ class ReservationController extends Controller
                     'message' => 'Không có quyền truy cập đặt trước này.'
                 ], 403);
             }
-
+            try {
+            } catch (\Throwable $th) {
+                //throw $th;
+            }
             return response()->json([
                 'message' => 'Success',
                 'data' => $reservation
@@ -160,11 +155,6 @@ class ReservationController extends Controller
             return response()->json([
                 'message' => 'Đặt trước không tồn tại.'
             ], 404);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Cập nhật đặt trước thất bại',
-                'error' => $e->getMessage()
-            ], 422);
         }
     }
 }

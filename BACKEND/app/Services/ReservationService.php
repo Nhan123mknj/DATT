@@ -28,7 +28,16 @@ class ReservationService extends BaseService
     public function createReservation(array $data)
     {
         return $this->runInTransactionWithRetry(function () use ($data) {
-            $userId = auth('api')->user()->id;
+            $user = auth('api')->user();
+            $userId = $user->id;
+
+            // Check credit score
+            if ($user->credit_score < 30) {
+                throw ValidationException::withMessages([
+                    'credit_score' => 'Điểm tín nhiệm của bạn quá thấp (' . $user->credit_score . '/100). Vui lòng liên hệ quản trị viên để biết thêm chi tiết.'
+                ]);
+            }
+
             $reservedFrom = $data['reserved_from'];
             $reservedUntil = $data['reserved_until'];
             $devices = collect($data['devices']);
@@ -39,13 +48,29 @@ class ReservationService extends BaseService
                 ->get()
                 ->keyBy('id');
 
+            $commitmentFilePath = null;
+            if (isset($data['commitment_file']) && $data['commitment_file'] instanceof \Illuminate\Http\UploadedFile) {
+                $commitmentFilePath = $data['commitment_file']->store('commitment_files', 'public');
+            }
+
             $reservation = DeviceReservation::create([
                 'user_id' => $userId,
                 'reserved_from' => $reservedFrom,
                 'reserved_until' => $reservedUntil,
                 'status' => 'pending',
                 'notes' => $data['notes'] ?? null,
+                'commitment_file' => $commitmentFilePath,
             ]);
+
+            $hasExpensive = $deviceUnits->contains(function ($unit) {
+                return $unit->device && $unit->device->category_id == 2;
+            });
+
+            if ($hasExpensive && empty($data['commitment_file'])) {
+                throw ValidationException::withMessages([
+                    'commitment_file' => 'Thiết bị đắt tiền yêu cầu nộp file cam kết trách nhiệm.'
+                ]);
+            }
 
             foreach ($devices as $item) {
                 $unitId = $item['device_unit_id'];
@@ -146,7 +171,7 @@ class ReservationService extends BaseService
                     'devices' => $reservation->details->map(function ($detail) {
                         return [
                             'device_unit_id' => $detail->device_unit_id,
-                            'condition_at_borrow' => 'tốt',
+                            'condition_at_borrow' => 'good',
                         ];
                     })->toArray(),
                     'notes' => "Tự động từ đặt trước #{$reservationId}",
@@ -157,8 +182,6 @@ class ReservationService extends BaseService
                 ];
 
                 $borrow = $this->borrowService->createBorrowingSlip($data);
-
-
 
                 $reservation->update([
                     'status' => 'completed',
@@ -229,10 +252,22 @@ class ReservationService extends BaseService
                 $detail->delete();
             }
 
-            // 2. Validate and reserve new units
             $deviceUnits = DeviceUnits::whereIn('id', $devices->pluck('device_unit_id'))
                 ->get()
                 ->keyBy('id');
+
+
+            $hasExpensive = $deviceUnits->contains(function ($unit) {
+                return $unit->device && $unit->device->category_id == 2;
+            });
+
+            $commitmentFile = $data['commitment_file'] ?? $reservation->commitment_file;
+
+            if ($hasExpensive && empty($commitmentFile)) {
+                throw ValidationException::withMessages([
+                    'commitment_file' => 'Thiết bị đắt tiền yêu cầu nộp file cam kết trách nhiệm.'
+                ]);
+            }
 
             foreach ($devices as $item) {
                 $unitId = $item['device_unit_id'];
@@ -260,12 +295,19 @@ class ReservationService extends BaseService
                 $unit->update(['status' => 'reserved']);
             }
 
-            // 3. Update reservation info
+            $commitmentFilePath = $reservation->commitment_file;
+            if (isset($data['commitment_file']) && $data['commitment_file'] instanceof \Illuminate\Http\UploadedFile) {
+                if ($reservation->commitment_file && \Illuminate\Support\Facades\Storage::disk('public')->exists($reservation->commitment_file)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($reservation->commitment_file);
+                }
+                $commitmentFilePath = $data['commitment_file']->store('commitment_files', 'public');
+            }
+
             $reservation->update([
                 'reserved_from' => $reservedFrom,
                 'reserved_until' => $reservedUntil,
                 'notes' => $data['notes'] ?? $reservation->notes,
-                'commitment_file' => $data['commitment_file'] ?? $reservation->commitment_file,
+                'commitment_file' => $commitmentFilePath,
             ]);
 
             return $reservation->load('details.deviceUnit.device');

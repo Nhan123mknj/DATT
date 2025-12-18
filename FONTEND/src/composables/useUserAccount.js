@@ -1,11 +1,12 @@
 import { computed } from 'vue';
 import { useToast } from 'vue-toastification';
-import authService, { user } from '../services/auth/authService';
+import { useAuthStore } from '../stores/authStore';
 
 export function useUserAccount() {
   const toast = useToast();
+  const authStore = useAuthStore();
   
-  const currentUser = user;
+  const currentUser = computed(() => authStore.user);
   
   const isLoading = computed(() => !currentUser.value);
 
@@ -17,7 +18,7 @@ export function useUserAccount() {
 
   const loadUserData = async () => {
     try {
-      await authService.verifyToken();
+      await authStore.verifyToken();
     } catch (error) {
       toast.error('Không thể tải thông tin tài khoản');
       console.error(error);

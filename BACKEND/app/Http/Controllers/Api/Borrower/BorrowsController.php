@@ -55,7 +55,8 @@ class BorrowsController extends Controller
         $result = Borrows::with([
             'details:id,borrow_id,device_unit_id',
             'details.deviceUnit:id,device_id,serial_number',
-            'details.deviceUnit.device:id,name'
+            'details.deviceUnit.device:id,name',
+            'reservation:id,commitment_file'
         ])->findOrFail($id);
 
         $this->authorize($result, 'view');

@@ -1,21 +1,36 @@
 <template>
   <div class="min-h-screen bg-gray-100">
-    <!-- Navigation -->
     <nav class="bg-white shadow-sm border-b border-gray-200">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
-          <!-- Logo and Navigation Links -->
           <div class="flex">
             <div class="shrink-0 flex items-center">
               <h1 class="text-xl font-bold text-gray-800">Staff Portal</h1>
             </div>
+
             <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
               <RouterLink
                 :to="{ name: 'staff.dashboard' }"
-                class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                active-class="border-indigo-500"
+                class="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300"
+                exact-active-class="border-indigo-500 text-gray-900"
               >
                 Dashboard
+              </RouterLink>
+
+              <RouterLink
+                :to="{ name: 'staff.reservations' }"
+                class="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300"
+                exact-active-class="border-indigo-500 text-gray-900"
+              >
+                Đặt trước
+              </RouterLink>
+
+              <RouterLink
+                :to="{ name: 'staff.borrows' }"
+                class="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300"
+                exact-active-class="border-indigo-500 text-gray-900"
+              >
+                Phiếu mượn
               </RouterLink>
             </div>
           </div>
@@ -54,32 +69,23 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { computed } from "vue";
+import { useRouter } from "vue-router";
 import { RouterLink } from "vue-router";
 import NotificationDropdown from "../components/common/NotificationDropdown.vue";
-import authService, { user } from "../services/auth/authService";
+import { useAuthStore } from "../stores/authStore";
 
-export default {
-  name: "StaffLayout",
-  components: {
-    RouterLink,
-    NotificationDropdown,
-  },
-  computed: {
-    currentUser() {
-      console.log(user);
-      return user.value;
-    },
-  },
-  methods: {
-    async handleLogout() {
-      try {
-        await authService.logout();
-        this.$router.push({ name: "login" });
-      } catch (error) {
-        console.error("Logout failed:", error);
-      }
-    },
-  },
+const router = useRouter();
+const authStore = useAuthStore();
+
+const currentUser = computed(() => authStore.user);
+
+const handleLogout = async () => {
+  try {
+    await authStore.logout();
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
 };
 </script>

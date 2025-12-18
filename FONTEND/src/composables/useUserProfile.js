@@ -1,10 +1,11 @@
 import { ref, watch } from 'vue';
 import { useToast } from 'vue-toastification';
 import { profileService } from '../services/auth/profileService';
-import authService from '../services/auth/authService';
+import { useAuthStore } from '../stores/authStore';
 
 export function useUserProfile(user) {
   const toast = useToast();
+  const authStore = useAuthStore();
 
   const profileForm = ref({
     name: '',
@@ -50,8 +51,8 @@ export function useUserProfile(user) {
       }
 
 
-      if (authService.updateUser) {
-        authService.updateUser({
+      if (authStore.updateUser) {
+        authStore.updateUser({
           name: profileForm.value.name,
           email: profileForm.value.email,
           phone: profileForm.value.phone,

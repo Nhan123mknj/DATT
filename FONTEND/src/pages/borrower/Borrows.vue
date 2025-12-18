@@ -115,114 +115,32 @@
       </div>
     </div>
 
-    <ModalForm
+    <BorrowDetailModal
       :show="showDetailModal"
-      title="Chi tiết phiếu mượn"
+      :borrow="selectedBorrow"
       @close="closeDetail"
-    >
-      <div v-if="selectedBorrow" class="space-y-5 text-sm text-gray-700">
-        <div
-          class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100"
-        >
-          <div>
-            <p
-              class="text-gray-500 text-xs uppercase tracking-wider font-semibold mb-1"
-            >
-              Mã phiếu
-            </p>
-            <p class="font-bold text-gray-900 text-lg">
-              #{{ selectedBorrow.id }}
-            </p>
-          </div>
-          <div class="text-right">
-            <p
-              class="text-gray-500 text-xs uppercase tracking-wider font-semibold mb-1"
-            >
-              Trạng thái
-            </p>
-            <span
-              class="px-3 py-1 rounded-full text-xs font-semibold inline-block"
-              :class="statusClasses(selectedBorrow.status)"
-            >
-              {{ statusReverseLabel(selectedBorrow.status) }}
-            </span>
-          </div>
-        </div>
+      @open-report="openReport"
+    />
 
-        <div class="grid grid-cols-2 gap-4">
-          <div class="p-3 border border-gray-100 rounded-lg">
-            <p class="text-gray-500 text-xs mb-1">Ngày mượn</p>
-            <p class="font-medium flex items-center gap-2">
-              <font-awesome-icon
-                icon="calendar-check"
-                class="text-indigo-500"
-              />
-              {{ formatDate(selectedBorrow.borrowed_date) }}
-            </p>
-          </div>
-          <div class="p-3 border border-gray-100 rounded-lg">
-            <p class="text-gray-500 text-xs mb-1">Trả dự kiến</p>
-            <p class="font-medium flex items-center gap-2">
-              <font-awesome-icon icon="hourglass-end" class="text-amber-500" />
-              {{ formatDate(selectedBorrow.expected_return_date) }}
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <p class="font-bold text-gray-900 mb-3 flex items-center gap-2">
-            <font-awesome-icon icon="boxes" class="text-gray-400" />
-            Danh sách thiết bị
-          </p>
-          <div
-            class="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden"
-          >
-            <ul class="divide-y divide-gray-200">
-              <li
-                v-for="detail in selectedBorrow.details"
-                :key="detail.id"
-                class="p-3 hover:bg-white transition-colors flex items-center justify-between"
-              >
-                <div>
-                  <span class="font-medium text-gray-900 block">{{
-                    detail.device_unit?.device?.name ||
-                    "Thiết bị không xác định"
-                  }}</span>
-                  <span class="text-xs text-gray-500 font-mono"
-                    >SN:
-                    {{
-                      detail.device_unit?.serial_number || detail.device_unit_id
-                    }}</span
-                  >
-                </div>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <button
-          type="button"
-          class="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 transition-colors"
-          @click="closeDetail"
-        >
-          Đóng
-        </button>
-      </template>
-    </ModalForm>
+    <ReportDeviceModal
+      v-model:visible="showReportModal"
+      :device-unit="selectedDeviceUnit"
+      @success="handleLoadBorrows"
+    />
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted } from "vue";
-import { RouterLink } from "vue-router";
+import { ref, reactive, onMounted, watch } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import Table from "../../components/common/Table.vue";
 import LoadingSkeleton from "../../components/common/LoadingSkeleton.vue";
 import Pagination from "../../components/common/Pagination.vue";
-// import Modal from "../../components/Modal.vue";
-import ModalForm from "../../components/ModalForm.vue";
-import { useBorrows } from "../../composables/fetchData/borrower/useBorrows";
+import BorrowDetailModal from "../../components/borrower/borrows/BorrowDetailModal.vue";
+import ReportDeviceModal from "../../components/maintenance/ReportDeviceModal.vue";
+import { useBorrowStore } from "../../stores/borrowStore";
+import { storeToRefs } from "pinia";
 import useStatusLabel from "../../composables/utils/statusLabel";
 import useFormatDate from "../../composables/utils/formatDate";
 
@@ -232,14 +150,18 @@ export default {
     Table,
     LoadingSkeleton,
     Pagination,
-    // Modal,
     RouterLink,
-    ModalForm,
+    BorrowDetailModal,
+    ReportDeviceModal,
   },
   setup() {
     const { statusReverseLabel, statusClasses } = useStatusLabel();
     const { formatDate } = useFormatDate();
-    const { borrows, pagination, isLoading, loadBorrows } = useBorrows();
+
+    // Use Store instead of Composable
+    const borrowStore = useBorrowStore();
+    const { borrows, pagination, isLoading } = storeToRefs(borrowStore);
+    const { fetchBorrows, fetchBorrowById } = borrowStore;
 
     const filters = reactive({
       status: "",
@@ -274,17 +196,53 @@ export default {
     };
 
     const handleLoadBorrows = (page = 1) => {
-      loadBorrows(page, filters);
+      fetchBorrows(page, filters);
     };
+
+    // Alias for template usage
+    const loadBorrows = handleLoadBorrows;
 
     const resetFilters = () => {
       filters.status = "";
       handleLoadBorrows();
     };
 
+    const route = useRoute();
+    const toast = useToast();
+
     onMounted(() => {
+      // Only fetch if empty or if you want fresh data on mount
+      // But usually we want fresh data on mount for lists
       handleLoadBorrows();
     });
+
+    // Watch for ID in URL to open detail modal
+    watch(
+      [() => route.query.id, () => borrows.value],
+      async ([id, borrowsList]) => {
+        if (id) {
+          try {
+            const borrow = await fetchBorrowById(id);
+            if (borrow) {
+              openDetail(borrow);
+            }
+          } catch (e) {
+            if (!isLoading.value) {
+              toast.error("Không tìm thấy phiếu mượn");
+            }
+          }
+        }
+      },
+      { immediate: true }
+    );
+
+    const showReportModal = ref(false);
+    const selectedDeviceUnit = ref(null);
+
+    const openReport = (deviceUnit) => {
+      selectedDeviceUnit.value = deviceUnit;
+      showReportModal.value = true;
+    };
 
     return {
       filters,
@@ -294,6 +252,7 @@ export default {
       isLoading,
       pagination,
       handleLoadBorrows,
+      loadBorrows,
       showDetailModal,
       selectedBorrow,
       openDetail,
@@ -302,6 +261,9 @@ export default {
       statusReverseLabel,
       statusClasses,
       formatDate,
+      showReportModal,
+      selectedDeviceUnit,
+      openReport,
     };
   },
 };

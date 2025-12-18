@@ -22,7 +22,9 @@ class DeviceReservation extends Model
         'notes',
         'deleted_at',
         'cancelled_by',
+        'cancelled_by',
         'cancelled_at',
+        'commitment_file',
     ];
 
     protected $casts = [

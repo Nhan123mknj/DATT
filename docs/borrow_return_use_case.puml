@@ -1,0 +1,56 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Người mượn (Borrower)" as B
+actor "Nhân viên (Staff)" as S
+actor "Bộ lập lịch (Scheduler)" as T <<Service>>
+
+rectangle "Hệ thống Quản lý Thiết bị" {
+    ' Core Use Cases
+    usecase "Tạo yêu cầu mượn" as UC_Borrow
+    usecase "Tạo yêu cầu đặt trước" as UC_Reserve
+    usecase "Kiểm tra tồn kho" as UC_CheckStock
+    usecase "Nộp cam kết" as UC_Commitment
+    
+    usecase "Duyệt yêu cầu" as UC_Approve
+    usecase "Xuất kho (Issue)" as UC_Issue
+    usecase "Mượn nhanh (Quick Borrow)" as UC_Quick
+    
+    usecase "Nhận trả thiết bị" as UC_Return
+    usecase "Tính phí bồi thường" as UC_Fine
+    
+    usecase "Tự động tạo phiếu" as UC_AutoConvert
+}
+
+' Actor Connections
+B --> UC_Borrow
+B --> UC_Reserve
+
+S --> UC_Approve
+S --> UC_Issue
+S --> UC_Quick
+S --> UC_Return
+
+T --> UC_AutoConvert
+
+' --- RELATIONSHIPS ---
+
+' INCLUDE (Bắt buộc phải có)
+' Khi tạo yêu cầu, hệ thống BẮT BUỘC phải kiểm tra tồn kho
+UC_Borrow ..> UC_CheckStock : <<include>>
+UC_Reserve ..> UC_CheckStock : <<include>>
+
+' Mượn nhanh là quy trình tắt, bao gồm luôn việc Xuất kho
+UC_Quick ..> UC_Issue : <<include>>
+UC_Quick ..> UC_CheckStock : <<include>>
+
+' EXTEND (Mở rộng/Có điều kiện)
+' Nộp cam kết chỉ xảy ra NẾU thiết bị là loại đắt tiền
+UC_Borrow <.. UC_Commitment : <<extend>> \n(Condition: Thiết bị đắt tiền)
+UC_Reserve <.. UC_Commitment : <<extend>> \n(Condition: Thiết bị đắt tiền)
+
+' Tính phí chỉ xảy ra NẾU thiết bị bị hỏng hoặc mất
+UC_Return <.. UC_Fine : <<extend>> \n(Condition: Hỏng/Mất)
+
+@enduml

@@ -242,4 +242,10 @@ class AdminDashboardService
             'utilization_rate' => $result->utilization_rate ?? 0,
         ];
     }
+
+    private function theMostBorrowedDevices(): array
+    {
+        $result = DB::select("SELECT count(*) as total_borrows, device_id FROM borrow_details GROUP BY device_id ORDER BY total_borrows DESC LIMIT 10");
+        return $result;
+    }
 }

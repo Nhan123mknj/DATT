@@ -7,6 +7,10 @@ export function useForm(options = {}) {
         updateData,
         rejectData,
         initialForm = {},
+        beforeOpenCreate,
+        beforeOpenEdit,
+        beforeOpenDetail,
+        beforeOpenReject,
     } = options;
 
     const toast = useToast();
@@ -25,6 +29,7 @@ export function useForm(options = {}) {
     const openCreate = () => {
         modalMode.value = 'create';
         resetForm();
+        if (beforeOpenCreate) beforeOpenCreate();
         showModal.value = true;
     };
 
@@ -33,6 +38,7 @@ export function useForm(options = {}) {
         resetForm();
 
         Object.assign(form, item);
+        if (beforeOpenEdit) beforeOpenEdit(item);
         errors.value = {};
         showModal.value = true;
     };
@@ -42,6 +48,7 @@ export function useForm(options = {}) {
         resetForm();
 
         Object.assign(form, item);
+        if (beforeOpenDetail) beforeOpenDetail(item);
         errors.value = {};
         showModal.value = true;
     };
@@ -52,6 +59,7 @@ export function useForm(options = {}) {
 
         Object.assign(form, item);
         if (!form.reason) form.reason = '';
+        if (beforeOpenReject) beforeOpenReject(item);
         errors.value = {};
         showModal.value = true;
     };

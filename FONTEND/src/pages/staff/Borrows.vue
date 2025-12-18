@@ -70,25 +70,21 @@
                 Xem
               </button>
               <button
-                v-if="item.status === 'pending'"
-                class="px-3 py-1 rounded-lg border border-green-200 text-green-700 text-sm"
-                @click="approveBorrow(item)"
+                v-if="item.status === 'approved'"
+                class="px-3 py-1 rounded-lg border border-blue-200 text-blue-600 text-sm"
+                @click="issueBorrow(item)"
               >
-                Duyệt
+                Xuất kho
               </button>
               <button
-                v-if="item.status === 'pending'"
+                v-if="item.status === 'approved'"
                 class="px-3 py-1 rounded-lg border border-red-200 text-red-600 text-sm"
-                @click="openReject(item)"
+                @click="cancelBorrow(item)"
               >
-                Từ chối
+                Hủy
               </button>
               <button
-                v-if="
-                  item.status === 'approved' ||
-                  item.status === 'borrowed' ||
-                  item.status === 'overdue'
-                "
+                v-if="item.status === 'borrowed' || item.status === 'overdue'"
                 class="px-3 py-1 rounded-lg border border-blue-200 text-blue-600 text-sm"
                 @click="openReturnModal(item)"
               >
@@ -124,12 +120,12 @@
       :show="showReturnModal"
       :borrow="returnTarget"
       :returnItems="returnItems"
-      :signatures="signatures"
+      :otp="returnOtp"
       :notes="returnNotes"
       :error="returnError"
       :loading="returnLoading"
       @update:returnItems="returnItems = $event"
-      @update:signatures="signatures = $event"
+      @update:otp="returnOtp = $event"
       @update:notes="returnNotes = $event"
       @close="closeReturnModal"
       @submit="submitReturn"
@@ -154,6 +150,12 @@
       @changeDevice="onDeviceChange"
       @updateQuantity="handleConsumableQuantity"
     />
+    <BorrowIssueOtpModal
+      :show="showIssueModal"
+      :borrow="issueTarget"
+      @close="closeIssueModal"
+      @success="handleLoadBorrows(pagination.current_page)"
+    />
   </div>
 </template>
 
@@ -168,6 +170,7 @@ import BorrowDetailModal from "../../components/staff/borrows/BorrowDetailModal.
 import BorrowRejectModal from "../../components/staff/borrows/BorrowRejectModal.vue";
 import BorrowReturnModal from "../../components/staff/borrows/BorrowReturnModal.vue";
 import BorrowCreateModal from "../../components/staff/borrows/BorrowCreateModal.vue";
+import BorrowIssueOtpModal from "../../components/staff/borrows/BorrowIssueOtpModal.vue";
 import { staffBorrowService } from "../../services/staff/staffBorrowService";
 import { deviceService } from "../../services/shared/deviceService";
 import { staffUserService } from "../../services/staff/staffUserService";
@@ -177,6 +180,7 @@ import { useQuickBorrow } from "../../composables/useQuickBorrow";
 import { useBorrowReturn } from "../../composables/useBorrowReturn";
 import useStatusLabel from "../../composables/utils/statusLabel";
 import useFormatDate from "../../composables/utils/formatDate";
+import { useDeviceUnitStore } from "../../stores/deviceUnitStore";
 
 export default {
   name: "StaffBorrows",
@@ -188,6 +192,7 @@ export default {
     BorrowRejectModal,
     BorrowReturnModal,
     BorrowCreateModal,
+    BorrowIssueOtpModal,
   },
   setup() {
     const toast = useToast();
@@ -280,6 +285,39 @@ export default {
       }
     };
 
+    const deviceUnitStore = useDeviceUnitStore();
+
+    // Issue Modal Logic
+    const showIssueModal = ref(false);
+    const issueTarget = ref({});
+
+    const issueBorrow = (borrow) => {
+      issueTarget.value = borrow;
+      showIssueModal.value = true;
+    };
+
+    const closeIssueModal = () => {
+      showIssueModal.value = false;
+      issueTarget.value = {};
+    };
+
+    const cancelBorrow = async (borrow) => {
+      if (!confirm("Xác nhận hủy phiếu mượn này (Khách không đến lấy)?"))
+        return;
+      try {
+        await staffBorrowService.cancel(borrow.id);
+        toast.success("Đã hủy phiếu mượn");
+        handleLoadBorrows(pagination.current_page);
+        if (deviceUnitStore.units.length > 0) {
+          deviceUnitStore.fetchUnits(deviceUnitStore.pagination.current_page);
+        }
+      } catch (error) {
+        toast.error(
+          error.response?.data?.message || "Không thể hủy phiếu mượn"
+        );
+      }
+    };
+
     onMounted(() => {
       handleLoadBorrows();
     });
@@ -324,13 +362,15 @@ export default {
       closeModal,
       save,
       approveBorrow,
+      issueBorrow,
+      cancelBorrow,
       showReturnModal,
       returnTarget,
       returnNotes,
+      returnOtp,
       returnError,
       returnLoading,
       returnItems,
-      signatures,
       openReturnModal,
       closeReturnModal,
       submitReturn,
@@ -353,6 +393,9 @@ export default {
       submitCreate,
       statusBorrowLabel,
       clearBorrower,
+      showIssueModal,
+      issueTarget,
+      closeIssueModal,
     };
   },
 };

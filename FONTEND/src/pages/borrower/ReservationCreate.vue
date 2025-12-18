@@ -339,10 +339,9 @@
           </p>
         </div>
 
-        <!-- Tóm tắt thiết bị đã chọn -->
         <div
           v-if="totalSelectedDevices > 0"
-          class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-xl p-6 shadow-sm"
+          class="bg-linear-to-br from-indigo-50 to-white border border-indigo-100 rounded-xl p-6 shadow-sm"
         >
           <h3 class="text-base font-bold text-gray-900 mb-4 flex items-center">
             <div
@@ -522,6 +521,7 @@ import { useToast } from "vue-toastification";
 import Button from "../../components/common/Button.vue";
 import MultiSelect from "../../components/common/MultiSelect.vue";
 import { reservationsService } from "../../services/borrower/reservationsService";
+import { useReservationStore } from "../../stores/reservationStore";
 import { deviceService } from "../../services/shared/deviceService";
 
 const DEVICE_TYPE_GUIDES = [
@@ -560,6 +560,7 @@ export default {
     const router = useRouter();
     const route = useRoute();
     const toast = useToast();
+    const reservationStore = useReservationStore();
 
     const isEditMode = computed(() => !!route.params.id);
 
@@ -656,7 +657,6 @@ export default {
       return summary;
     }
 
-    // Event handlers
     async function onCategorySelect(groupIndex, selectedIds) {
       const group = deviceGroups.value[groupIndex];
       const categoryId =
@@ -875,11 +875,19 @@ export default {
           }
         }
 
-        const allDeviceUnits = deviceGroups.value.flatMap((group) =>
-          (group.device_unit_ids || []).map((unitId) => ({
-            device_unit_id: unitId,
-          }))
-        );
+        const allDeviceUnits = deviceGroups.value.flatMap((group) => {
+          if (group.category_type === "consumable") {
+            return (group.device_unit_ids || []).map((unitId) => ({
+              device_unit_id: unitId,
+              notes: "",
+            }));
+          } else {
+            return (group.device_unit_ids || []).map((unitId) => ({
+              device_unit_id: unitId,
+              notes: "",
+            }));
+          }
+        });
 
         if (!allDeviceUnits.length) {
           toast.error("Vui lòng chọn ít nhất một đơn vị thiết bị");
@@ -899,21 +907,18 @@ export default {
           await reservationsService.update(route.params.id, payload);
           toast.success("Cập nhật đặt trước thành công");
         } else {
-          await reservationsService.create(payload);
-          toast.success("Tạo đặt trước thành công");
+          await reservationStore.createReservation(payload);
         }
 
         router.push({ name: "borrower.reservations" });
       } catch (error) {
         if (error.response && error.response.status === 422) {
           errors.value = error.response.data.errors || {};
-          toast.error("Vui lòng kiểm tra lại thông tin");
+          // toast.error("Vui lòng kiểm tra lại thông tin");
         } else {
-          toast.error(
-            isEditMode.value
-              ? "Cập nhật đặt trước thất bại"
-              : "Tạo đặt trước thất bại"
-          );
+          if (isEditMode.value) {
+            toast.error("Cập nhật đặt trước thất bại");
+          }
         }
       } finally {
         submitting.value = false;

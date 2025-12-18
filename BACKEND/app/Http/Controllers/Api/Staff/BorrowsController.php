@@ -139,6 +139,37 @@ class BorrowsController extends Controller
         ]);
     }
 
+    public function cancel(string $id)
+    {
+        $result = $this->borrowService->cancelBorrow($id);
+        return response()->json([
+            'message' => 'Đã hủy phiếu mượn thành công',
+            'borrowSlip' => $result
+        ]);
+    }
+
+    public function issue(Request $request, string $id)
+    {
+        $otp = $request->input('otp');
+        $result = $this->borrowService->issueBorrow($id, $otp);
+        return response()->json([
+            'message' => 'Xuất thiết bị thành công',
+            'borrowSlip' => $result
+        ]);
+    }
+
+    public function sendOtp(string $id)
+    {
+        $result = $this->borrowService->sendIssueOtp($id);
+        return response()->json($result);
+    }
+
+    public function sendReturnOtp(string $id)
+    {
+        $result = $this->borrowService->sendReturnOtp($id);
+        return response()->json($result);
+    }
+
     public function processReturn(Request $request, string $id)
     {
         $request->validate([
@@ -146,10 +177,8 @@ class BorrowsController extends Controller
             'return_items.*.device_unit_id' => 'required|integer|exists:device_units,id',
             'return_items.*.condition_at_return' => 'required|in:excellent,good,fair,damaged,broken',
             'return_items.*.photos' => 'nullable|array|max:5',
-            'return_items.*.photos.*' => 'image|max:5120', 
-            'signatures' => 'required|array',
-            'signatures.staff' => 'required|string', 
-            'signatures.borrower' => 'required|string',
+            'return_items.*.photos.*' => 'image|max:5120',
+            'otp' => 'required|string|size:6',
             'notes' => 'nullable|string|max:1000',
         ]);
 
@@ -169,16 +198,13 @@ class BorrowsController extends Controller
         $result = $this->borrowService->createReturnSlip(
             $id,
             $returnItems,
-            $request->signatures,
+            $request->otp,
             $request->notes
         );
 
         return response()->json([
             'message' => 'Đã xử lý trả thiết bị thành công',
-            'borrowSlip' => $result,
-            'pdf_url' => $result->return_slip_pdf_path
-                ? asset('storage/' . $result->return_slip_pdf_path)
-                : null
+            'borrowSlip' => $result
         ]);
     }
 }

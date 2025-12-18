@@ -1,22 +1,22 @@
 <template>
   <div class="p-6">
-    <!-- Header -->
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold">Danh sách người dùng</h1>
 
-      <Button label="Thêm mới" @click="openCreate">
+      <Button label="Thêm mới" @click="userStore.openCreate()">
         <template #icon>
           <font-awesome-icon icon="plus" class="mr-2" />
         </template>
       </Button>
     </div>
+
     <div
       class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4 space-y-4"
     >
       <div class="grid gap-3 md:grid-cols-4">
         <SearchBar v-on:handleSearch="handleSearch" />
         <Dropdown
-          v-model="filters.role"
+          v-model="userStore.filters.role"
           label="Vai trò"
           :options="[
             { label: 'Quản trị viên', value: 'admin' },
@@ -28,7 +28,7 @@
           idKey="value"
         />
         <Dropdown
-          v-model="filters.is_active"
+          v-model="userStore.filters.is_active"
           label="Trạng thái"
           :options="[
             { label: 'Kích hoạt', value: '1' },
@@ -40,22 +40,27 @@
 
         <div class="flex gap-2">
           <Button label="Đặt lại" @click="resetFilters" color="gray" />
-          <Button label="Lọc" @click="loadData()" />
+          <Button label="Lọc" @click="userStore.loadUsers()" />
         </div>
       </div>
     </div>
 
     <div>
-      <LoadingSkeleton v-if="isLoading" />
+      <TableLoading v-if="userStore.loading" />
       <Table
         v-else
-        :data="users"
+        :data="userStore.users"
         :headers="headers"
-        @edit="openEdit"
+        @edit="userStore.openEdit"
         @delete="handleDelete"
       >
         <template #STT="{ index }">
-          {{ (pagination.current_page - 1) * pagination.per_page + index + 1 }}
+          {{
+            (userStore.pagination.current_page - 1) *
+              userStore.pagination.per_page +
+            index +
+            1
+          }}
         </template>
         <template #role="{ item }">{{ getRoleLabel(item.role) }}</template>
         <template #is_active="{ item }">
@@ -76,7 +81,7 @@
           </button>
 
           <button
-            @click="openEdit(item)"
+            @click="userStore.openEdit(item)"
             class="px-2 py-1 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition"
             title="Chỉnh sửa"
           >
@@ -93,133 +98,83 @@
         </template>
       </Table>
       <Pagination
-        v-if="pagination.total && pagination.last_page > 1"
-        :links="pagination.links"
-        @page-changed="loadData"
+        v-if="userStore.pagination.total && userStore.pagination.last_page > 1"
+        :links="userStore.pagination.links"
+        @page-changed="userStore.loadUsers"
       />
     </div>
   </div>
+
   <AddUserForm
-    :visible="showModal && modalMode === 'create'"
-    @close="closeModal"
-    @refresh="loadData"
+    :visible="userStore.showModal && userStore.modalMode === 'create'"
+    @close="userStore.closeModal()"
+    @refresh="userStore.loadUsers(userStore.pagination.current_page)"
   />
   <UpdateUserForm
-    :visible="showModal && modalMode === 'edit'"
-    :user-data="form"
-    @close="closeModal"
-    @refresh="loadData"
+    :visible="userStore.showModal && userStore.modalMode === 'edit'"
+    :user-data="userStore.userForm"
+    @close="userStore.closeModal()"
+    @refresh="userStore.loadUsers(userStore.pagination.current_page)"
   />
 </template>
 
-<script>
+<script setup>
 import { ref, onMounted } from "vue";
 import { usersService } from "../../../services/admin/usersService";
 import { useToast } from "vue-toastification";
+import { useUserStore } from "../../../stores/userStore";
 import Table from "../../../components/common/Table.vue";
 import Button from "../../../components/common/Button.vue";
-import LoadingSkeleton from "../../../components/common/LoadingSkeleton.vue";
+import TableLoading from "../../../components/common/TableLoading.vue";
 import AddUserForm from "../../../components/user/AddUserForm.vue";
 import UpdateUserForm from "../../../components/user/UpdateUserForm.vue";
 import Pagination from "../../../components/common/Pagination.vue";
 import Dropdown from "../../../components/common/Dropdown.vue";
 import SearchBar from "../../../components/common/SearchBar.vue";
-import { useUsers } from "../../../composables/fetchData/admin/useUsers";
-import useUserFilter from "../../../composables/filter/useUserFilter";
 import useStatusLabel from "../../../composables/utils/statusLabel";
-import { useForm } from "../../../composables/useForm";
 
-export default {
-  name: "UsersIndex",
-  components: {
-    Table,
-    Button,
-    LoadingSkeleton,
-    AddUserForm,
-    UpdateUserForm,
-    Pagination,
-    Dropdown,
-    SearchBar,
-  },
-  setup() {
-    const { filters, resetFilters } = useUserFilter();
-    const { statusActive, statusActiveClass, getRoleLabel } = useStatusLabel();
-    const toast = useToast();
+const toast = useToast();
+const userStore = useUserStore();
+const { statusActive, statusActiveClass, getRoleLabel } = useStatusLabel();
 
-    const selectedUser = ref(null);
-    const showDetailModal = ref(false);
+const selectedUser = ref(null);
+const showDetailModal = ref(false);
 
-    const { users, isLoading, pagination, loadUsers, deleteUser } = useUsers();
-
-    const handleLoadUsers = (page = 1) => {
-      loadUsers(page, filters);
-    };
-
-    const headers = {
-      name: "Tên",
-      email: "Email",
-      role: "Vai trò",
-      is_active: "Trạng thái",
-    };
-
-    const { form, showModal, modalMode, openCreate, openEdit, closeModal } =
-      useForm({
-        initialForm: {
-          id: null,
-          name: "",
-          email: "",
-          role: "",
-          is_active: 1,
-        },
-      });
-
-    const handleSearch = (data) => {
-      filters.search = data;
-      handleLoadUsers();
-    };
-
-    const viewDetail = async (user) => {
-      try {
-        const res = await usersService.getUserById(user.id);
-        selectedUser.value = res.data.data || res.data;
-        showDetailModal.value = true;
-      } catch {
-        toast.error("Không thể tải chi tiết người dùng");
-      }
-    };
-
-    const handleDelete = async (user) => {
-      const deleted = await deleteUser(user.id);
-      if (deleted) handleLoadUsers(pagination.current_page);
-    };
-
-    onMounted(() => {
-      handleLoadUsers();
-    });
-
-    return {
-      filters,
-      resetFilters,
-      statusActive,
-      getRoleLabel,
-      users,
-      isLoading,
-      pagination,
-      loadData: handleLoadUsers,
-      handleDelete,
-      headers,
-      form,
-      showModal,
-      modalMode,
-      openCreate,
-      openEdit,
-      closeModal,
-      handleSearch,
-      viewDetail,
-      selectedUser,
-      showDetailModal,
-      statusActiveClass,
-    };
-  },
+const headers = {
+  name: "Tên",
+  email: "Email",
+  role: "Vai trò",
+  is_active: "Trạng thái",
 };
+
+const handleSearch = (data) => {
+  userStore.filters.search = data;
+  userStore.loadUsers();
+};
+
+const resetFilters = () => {
+  userStore.resetFilters();
+  userStore.loadUsers();
+};
+
+const viewDetail = async (user) => {
+  try {
+    const res = await usersService.getUserById(user.id);
+    selectedUser.value = res.data.data || res.data;
+    showDetailModal.value = true;
+  } catch {
+    toast.error("Không thể tải chi tiết người dùng");
+  }
+};
+
+const handleDelete = async (user) => {
+  const deleted = await userStore.deleteUser(user.id);
+  if (deleted) {
+    userStore.loadUsers(userStore.pagination.current_page);
+  }
+};
+
+onMounted(() => {
+  userStore.loadUsers();
+});
 </script>

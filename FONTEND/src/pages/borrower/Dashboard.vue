@@ -217,12 +217,12 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, computed } from "vue";
 import { useToast } from "vue-toastification";
 import { RouterLink } from "vue-router";
 import { reservationsService } from "../../services/borrower/reservationsService";
 import { borrowService } from "../../services/borrower/borrowService";
-import authService from "../../services/auth/authService";
+import { useAuthStore } from "../../stores/authStore";
 import apiClient from "../../services/api/apiClient";
 import { useDataTable } from "../../composables/fetchData/useDataTable";
 import useStatusLabel from "../../composables/utils/statusLabel";
@@ -237,8 +237,9 @@ export default {
     const toast = useToast();
     const { statusReverseLabel, statusClasses } = useStatusLabel();
     const { formatDate } = useFormatDate();
+    const authStore = useAuthStore();
 
-    const currentUser = ref(authService.getCurrentUser());
+    const currentUser = computed(() => authStore.user);
 
     const stats = reactive({
       totalReservations: 0,

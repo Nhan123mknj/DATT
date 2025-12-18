@@ -61,6 +61,12 @@ const admin = [
         component: () => import('../pages/admin/MenuManagement.vue'),
         meta: { title: 'Quản lý Menu' },
       },
+      {
+        path: 'maintenances',
+        name: 'admin.maintenances',
+        component: () => import('../pages/admin/Maintenances.vue'),
+        meta: { title: 'Quản lý Bảo trì' },
+      },
     ],
   },
 ]

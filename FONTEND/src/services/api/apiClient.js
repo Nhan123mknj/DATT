@@ -1,5 +1,5 @@
 import axios from 'axios'
-import authService from '../auth/authService'
+
 import router from '../../router'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL 
@@ -11,8 +11,11 @@ const apiClient = axios.create({
   },
 })
 
+import { useAuthStore } from '../../stores/authStore'
+
 apiClient.interceptors.request.use((config) => {
-  const token = authService.getToken()
+  const authStore = useAuthStore()
+  const token = authStore.token
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -28,11 +31,11 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status
+    const authStore = useAuthStore()
 
     if (status === 401) {
-      authService.logout()
-      if (router.currentRoute.value.name !== 'login') {
-        router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+      if (!error.config.url.includes('/auth/logout')) {
+        authStore.logout()
       }
     }
 

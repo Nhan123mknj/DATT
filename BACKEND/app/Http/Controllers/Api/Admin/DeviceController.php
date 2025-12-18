@@ -44,7 +44,7 @@ class DeviceController extends Controller
             'category_id' => 'required|exists:device_categories,id',
             'manufacturer' => 'required|string|max:255',
             'model' => 'required|string|max:255',
-            'specifications' => 'nullable|string',
+            'specifications' => 'nullable|array',
             'is_active' => 'boolean',
         ]);
         if ($validator->fails()) {

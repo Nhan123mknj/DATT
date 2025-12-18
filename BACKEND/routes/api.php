@@ -16,9 +16,12 @@ use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Admin\MenuController;
+
 use App\Http\Controllers\Api\Admin\ReservationsController;
 use App\Http\Controllers\Api\Borrower\ReservationController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\DeviceMaintenanceController;
+use App\Http\Controllers\Api\BorrowReturnController;
 
 
 Route::middleware(['auth:api'])->prefix('notifications')->group(function () {
@@ -27,6 +30,7 @@ Route::middleware(['auth:api'])->prefix('notifications')->group(function () {
     Route::post('/{id}/mark-read', [NotificationController::class, 'markAsRead']);
     Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
 });
+
 
 Route::prefix('admin')->middleware(['auth:api', 'role:admin'])->group(function () {
     Route::get('dashboard/statistics', [AdminDashboardController::class, 'statistics']);
@@ -67,11 +71,17 @@ Route::prefix('admin')->middleware(['auth:api', 'role:admin'])->group(function (
     Route::put('menus/{id}', [MenuController::class, 'update']);
     Route::delete('menus/{id}', [MenuController::class, 'destroy']);
 
-    // Menu Items
+
     Route::post('menu-items', [MenuController::class, 'storeItem']);
     Route::put('menu-items/{id}', [MenuController::class, 'updateItem']);
     Route::delete('menu-items/{id}', [MenuController::class, 'destroyItem']);
     Route::post('menu-items/reorder', [MenuController::class, 'reorder']);
+
+    Route::get('maintenances', [DeviceMaintenanceController::class, 'index']);
+    Route::post('maintenances', [DeviceMaintenanceController::class, 'store']);
+    Route::get('maintenances/{id}', [DeviceMaintenanceController::class, 'show']);
+    Route::put('maintenances/{id}', [DeviceMaintenanceController::class, 'update']);
+    Route::delete('maintenances/{id}', [DeviceMaintenanceController::class, 'destroy']);
 });
 
 
@@ -80,7 +90,7 @@ Route::middleware(['auth:api'])->group(function () {
 });
 
 Route::prefix('borrower')->middleware(['auth:api', 'role:student,teacher,admin'])->group(function () {
-    // Dashboard statistics
+
     Route::get('dashboard/statistics', [BorrowerDashboardController::class, 'statistics']);
 
     Route::apiResource('borrows', BorrowsController::class);
@@ -96,7 +106,7 @@ Route::prefix('borrower')->middleware(['auth:api', 'role:student,teacher,admin']
 });
 
 Route::prefix('staff')->middleware(['auth:api', 'role:staff,admin'])->group(function () {
-    // Dashboard statistics
+
     Route::get('dashboard/statistics', [StaffDashboardController::class, 'statistics']);
 
     Route::get('reservations', [StaffReservationController::class, 'index']);
@@ -108,6 +118,10 @@ Route::prefix('staff')->middleware(['auth:api', 'role:staff,admin'])->group(func
     Route::apiResource('borrows', StaffBorrowsController::class);
     Route::post('borrows/{id}/approve', [StaffBorrowsController::class, 'approve']);
     Route::post('borrows/{id}/reject', [StaffBorrowsController::class, 'reject']);
+    Route::post('borrows/{id}/cancel', [StaffBorrowsController::class, 'cancel']);
+    Route::post('borrows/{id}/issue', [StaffBorrowsController::class, 'issue']);
+    Route::post('borrows/{id}/send-otp', [StaffBorrowsController::class, 'sendOtp']);
+    Route::post('borrows/{id}/send-return-otp', [StaffBorrowsController::class, 'sendReturnOtp']);
     Route::post('borrows/{id}/return', [StaffBorrowsController::class, 'processReturn']);
     Route::get('users', [App\Http\Controllers\Api\Staff\UserController::class, 'index']);
 });
@@ -138,4 +152,5 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('device-categories', [SharedDeviceController::class, 'categories']);
     Route::get('device-categories/{id}/devices', [SharedDeviceController::class, 'devicesByCategory']);
     Route::get('devices/{id}/device-units', [SharedDeviceController::class, 'deviceUnitsByDevice']);
+    Route::apiResource('maintenances', DeviceMaintenanceController::class);
 });

@@ -26,6 +26,12 @@ const staff = [
         meta: { title: 'Phiếu mượn' },
       },
       {
+        path: 'maintenance',
+        name: 'staff.maintenance',
+        component: () => import('../pages/staff/maintenance/index.vue'),
+        meta: { title: 'Quản lý bảo trì' },
+      },
+      {
         path: 'account',
         name: 'staff.account',
         component: () => import('../layout/AccountLayout.vue'),

@@ -44,4 +44,14 @@ class DeviceUnits extends Model
     {
         return $this->hasMany(BorrowsDetail::class, 'device_unit_id');
     }
+
+    public function logs()
+    {
+        return $this->hasMany(DeviceLog::class, 'device_unit_id');
+    }
+
+    public function maintenances()
+    {
+        return $this->hasMany(DeviceMaintenance::class, 'device_unit_id');
+    }
 }

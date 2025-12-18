@@ -159,13 +159,13 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, computed } from "vue";
 import { useToast } from "vue-toastification";
 import { RouterLink } from "vue-router";
 import StatCard from "../../components/common/StatCard.vue";
+import { useDeviceCategoryStore } from "../../stores/deviceCategoryStore";
+import { useDeviceStore } from "../../stores/deviceStore";
 import { usersService } from "../../services/admin/usersService";
-import { deviceCategoriesService } from "../../services/devices/deviceCategoriesService";
-import { devicesService } from "../../services/devices/devicesService";
 import { reservationsService } from "../../services/admin/reservationsSevice";
 import useStatusLabel from "../../composables/utils/statusLabel";
 import useFormatDate from "../../composables/utils/formatDate";
@@ -179,10 +179,13 @@ export default {
     const toast = useToast();
     const { statusReverseLabel, statusClasses } = useStatusLabel();
     const { formatDate } = useFormatDate();
+    const deviceStore = useDeviceStore();
+    const categoryStore = useDeviceCategoryStore();
+
     const stats = reactive({
       users: 0,
-      categories: 0,
-      devices: 0,
+      categories: computed(() => categoryStore.pagination.total),
+      devices: computed(() => deviceStore.pagination.total),
       pendingReservations: 0,
     });
 
@@ -222,9 +225,7 @@ export default {
         const { data } = await reservationsService.getReservations({
           per_page: 5,
         });
-        // console.log(data.data);
         recentReservations.value = data.data?.data || [];
-        // console.log(recentReservations.value);
       } catch (error) {
         console.error("Load reservations error:", error);
       } finally {
@@ -234,16 +235,15 @@ export default {
 
     const fetchStats = async () => {
       try {
-        const [usersRes, categoriesRes, devicesRes, pendingRes] =
-          await Promise.allSettled([
-            usersService.getAllUser({ page: 1 }),
-            deviceCategoriesService.list({ page: 1 }),
-            devicesService.list({ page: 1 }),
-            reservationsService.getReservations({
-              status: ["pending"],
-              per_page: 1,
-            }),
-          ]);
+        const [usersRes, pendingRes] = await Promise.allSettled([
+          usersService.getAllUser({ page: 1 }),
+          reservationsService.getReservations({
+            status: ["pending"],
+            per_page: 1,
+          }),
+          deviceStore.fetchDevices({ page: 1 }),
+          categoryStore.fetchCategories({ page: 1 }),
+        ]);
 
         const getTotal = (res, path) => {
           if (res.status !== "fulfilled") return 0;
@@ -252,8 +252,6 @@ export default {
         };
 
         stats.users = getTotal(usersRes);
-        stats.categories = getTotal(categoriesRes, "categories");
-        stats.devices = getTotal(devicesRes, "devices");
         stats.pendingReservations = getTotal(pendingRes, "data");
       } catch (error) {
         toast.error("Không thể tải thống kê");

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 class CancelPendingReservations extends Command
 {
     protected $signature = 'reservations:cancel-pending {--hours=24}';
-    protected $description = 'Auto-cancel pending reservations older than specified hours';
+    protected $description = 'Tự động hủy phiếu khi chưa được duyệt';
 
     public function handle()
     {
@@ -47,7 +47,6 @@ class CancelPendingReservations extends Command
 
                     $reservation->details()->update(['status' => 'cancelled']);
 
-                    // Notify user via Pusher
                     if ($reservation->user) {
                         broadcast(new \App\Events\ReservationRequestCancel($reservation));
                     }

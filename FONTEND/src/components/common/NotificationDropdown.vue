@@ -104,10 +104,11 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useNotifications } from "../../stores/notificationStore";
-import authService from "../../services/auth/authService";
+import { useAuthStore } from "../../stores/authStore";
 
 const router = useRouter();
 const notifStore = useNotifications();
+const authStore = useAuthStore();
 const notificationsList = notifStore.notifications;
 const isOpen = ref(false);
 const dropdownRef = ref(null);
@@ -129,7 +130,7 @@ const handleNotificationClick = async (notif) => {
   isOpen.value = false;
 
   const data = notif.data || {};
-  const user = authService.getUser();
+  const user = authStore.user;
 
   if (data.reservation_id) {
     const role = user?.role;

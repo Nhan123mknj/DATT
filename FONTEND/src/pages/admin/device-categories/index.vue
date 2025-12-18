@@ -39,7 +39,7 @@
         </div>
       </div>
 
-      <LoadingSkeleton v-if="isLoading" />
+      <TableLoading v-if="isLoading" />
       <div v-else>
         <Table :data="categories" :headers="headers">
           <template #code="{ item }">
@@ -155,10 +155,10 @@
 </template>
 
 <script>
-import { reactive, computed, onMounted } from "vue";
+import { computed, onMounted } from "vue";
 import Table from "../../../components/common/Table.vue";
 import Button from "../../../components/common/Button.vue";
-import LoadingSkeleton from "../../../components/common/LoadingSkeleton.vue";
+import TableLoading from "../../../components/common/TableLoading.vue";
 import Pagination from "../../../components/common/Pagination.vue";
 import Modal from "../../../components/Modal.vue";
 import SearchBar from "../../../components/common/SearchBar.vue";
@@ -170,26 +170,25 @@ export default {
   components: {
     Table,
     Button,
-    LoadingSkeleton,
+    TableLoading,
     Pagination,
     Modal,
     SearchBar,
   },
   setup() {
-    const filters = reactive({
-      search: "",
-    });
-
     const {
       categories,
       isLoading,
       pagination,
       loadCategories,
       deleteCategory,
+      filters,
+      addCategory,
+      updateCategory,
     } = useDeviceCategories();
 
     const handleLoadCategories = (page = 1) => {
-      loadCategories(page, filters);
+      loadCategories(page);
     };
 
     const {
@@ -202,8 +201,16 @@ export default {
       closeModal,
       save,
     } = useForm({
-      createData: (data) => deviceCategoriesService.create(data),
-      updateData: (id, data) => deviceCategoriesService.update(id, data),
+      createData: async (data) => {
+        const success = await addCategory(data);
+        if (!success) throw new Error("Failed to create");
+        return { success: true };
+      },
+      updateData: async (id, data) => {
+        const success = await updateCategory(id, data);
+        if (!success) throw new Error("Failed to update");
+        return { success: true };
+      },
       initialForm: {
         id: null,
         name: "",

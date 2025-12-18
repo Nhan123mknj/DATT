@@ -18,7 +18,7 @@ class ProcessDueReservations extends Command
         $this->info('🔄 Xử lý các đặt trước đã đến hạn lúc ' . now());
 
         $missedReservations = DeviceReservation::where('status', 'approved')
-            ->where('reserved_from', '<=', now())
+            ->where('reserved_from', '<=', now()->subMinutes(5))
             ->where('status', '!=', 'completed')
             ->get();
 

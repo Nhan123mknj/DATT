@@ -17,7 +17,6 @@
     <nav class="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
       <ul class="space-y-1">
         <li v-for="item in menuItems" :key="item.id">
-          <!-- Parent Item with Children -->
           <button
             v-if="item.children && item.children.length"
             @click="toggle(item.id)"
@@ -52,37 +51,34 @@
             </svg>
           </button>
 
-          <!-- Single Link Item -->
           <RouterLink
             v-else-if="item.url"
             :to="item.url"
             class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors duration-200"
             :class="linkClasses(item.url)"
           >
-            <span
+            <font-awesome-icon
               v-if="item.icon"
-              :class="item.icon"
+              :icon="item.icon"
               class="w-5 text-center"
-            ></span>
+            />
             <span>{{ item.label }}</span>
           </RouterLink>
 
-          <!-- Non-link Item -->
           <div
             v-else
             class="px-3 py-2.5 text-sm font-medium text-gray-400 cursor-default"
           >
             <div class="flex items-center gap-3">
-              <span
+              <font-awesome-icon
                 v-if="item.icon"
-                :class="item.icon"
+                :icon="item.icon"
                 class="w-5 text-center"
-              ></span>
+              />
               <span>{{ item.label }}</span>
             </div>
           </div>
 
-          <!-- Children Submenu -->
           <transition name="collapse">
             <ul
               v-if="item.children && item.children.length && isOpen(item.id)"
@@ -95,11 +91,11 @@
                   class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors duration-200"
                   :class="linkClasses(child.url)"
                 >
-                  <span
+                  <font-awesome-icon
                     v-if="child.icon"
-                    :class="child.icon"
+                    :icon="child.icon"
                     class="w-4 text-center text-xs"
-                  ></span>
+                  />
                   <span>{{ child.label }}</span>
                 </RouterLink>
                 <div v-else class="px-3 py-2 text-sm text-gray-400">
@@ -120,128 +116,117 @@
   </aside>
 </template>
 
-<script>
-import { RouterLink } from "vue-router";
+<script setup>
+import { ref, watch, onMounted } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 import apiClient from "../../services/api/apiClient";
-import authService from "../../services/auth/authService";
+import { useAuthStore } from "../../stores/authStore";
 
-export default {
-  name: "SideBar",
-  data() {
-    return {
-      menuItems: [],
-      openMap: {},
-    };
-  },
-  watch: {
-    "$route.path"() {
-      this.expandActiveParents();
-    },
-  },
-  mounted() {
-    this.fetchMenu();
-  },
-  methods: {
-    normalizeRoute(path) {
-      if (!path) return null;
-      return path;
-    },
-    transformItems(items) {
-      return items
+const route = useRoute();
+const authStore = useAuthStore();
+
+const menuItems = ref([]);
+const openMap = ref({});
+
+const normalizeRoute = (path) => {
+  if (!path) return null;
+  return path;
+};
+
+const transformItems = (items) => {
+  return items
+    .map((item) => ({
+      ...item,
+      url: normalizeRoute(item.url),
+      children: item.children ? transformItems(item.children) : [],
+    }))
+    .filter((item) => {
+      return item.url || item.children?.length;
+    });
+};
+
+const isActivePath = (path) => {
+  if (!path) return false;
+  return route.path === path || route.path.startsWith(path + "/");
+};
+
+const expandActiveParents = () => {
+  menuItems.value.forEach((item) => {
+    if (item.children?.some((child) => isActivePath(child.url))) {
+      openMap.value[item.id] = true;
+    }
+  });
+};
+
+const fetchMenu = async () => {
+  try {
+    const response = await apiClient.get("/menus/main");
+    const items = response.data?.data || [];
+
+    if (!Array.isArray(items) || items.length === 0) {
+      menuItems.value = [];
+      return;
+    }
+
+    const rootItems = items.filter((item) => !item.parent_id);
+
+    const buildChildren = (parentId, allItems) => {
+      return allItems
+        .filter((item) => item.parent_id === parentId)
         .map((item) => ({
           ...item,
-          url: this.normalizeRoute(item.url),
-          children: item.children ? this.transformItems(item.children) : [],
-        }))
-        .filter((item) => {
-          return item.url || item.children?.length;
-        });
-    },
-    async fetchMenu() {
-      try {
-        const response = await apiClient.get("/menus/main");
-        const items = response.data?.data || [];
+          url: normalizeRoute(item.url),
+          children: buildChildren(item.id, allItems),
+        }));
+    };
 
-        if (!Array.isArray(items) || items.length === 0) {
-          this.menuItems = [];
-          return;
-        }
-
-        const rootItems = items.filter((item) => !item.parent_id);
-
-        const buildChildren = (parentId, allItems) => {
-          return allItems
-            .filter((item) => item.parent_id === parentId)
-            .map((item) => ({
-              ...item,
-              url: this.normalizeRoute(item.url),
-              children: buildChildren(item.id, allItems),
-            }));
+    const buildTree = (rootItems) => {
+      return rootItems.map((item) => {
+        const children = buildChildren(item.id, items);
+        return {
+          ...item,
+          url: normalizeRoute(item.url),
+          children: children,
         };
-
-        const buildTree = (rootItems) => {
-          return rootItems.map((item) => {
-            const children = buildChildren(item.id, items);
-            return {
-              ...item,
-              url: this.normalizeRoute(item.url),
-              children: children,
-            };
-          });
-        };
-
-        const tree = buildTree(rootItems);
-        let finalItems = this.transformItems(tree);
-
-        // Add Admin Menu Management link if admin
-        const currentUser = authService.getUser();
-        if (currentUser?.role === "admin") {
-          const exists = finalItems.find((i) => i.url === "/admin/menus");
-          if (!exists) {
-            finalItems.push({
-              id: "admin-menu-management",
-              label: "Quản lý Menu",
-              url: "/admin/menus",
-              icon: "fas fa-bars",
-              children: [],
-            });
-          }
-        }
-
-        this.menuItems = finalItems;
-        this.expandActiveParents();
-      } catch (e) {
-        console.error("❌ Sidebar menu error:", e);
-        this.menuItems = [];
-      }
-    },
-    toggle(id) {
-      this.openMap[id] = !this.openMap[id];
-    },
-    isOpen(id) {
-      return !!this.openMap[id];
-    },
-    isActivePath(path) {
-      if (!path) return false;
-      return (
-        this.$route.path === path || this.$route.path.startsWith(path + "/")
-      );
-    },
-    linkClasses(path) {
-      const active = this.isActivePath(path);
-      return active
-        ? "bg-indigo-50 text-indigo-600 font-semibold shadow-sm"
-        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900";
-    },
-    expandActiveParents() {
-      this.menuItems.forEach((item) => {
-        if (item.children?.some((child) => this.isActivePath(child.url))) {
-          this.openMap[item.id] = true;
-        }
       });
-    },
-  },
+    };
+
+    const tree = buildTree(rootItems);
+    console.log("🌲 Tree before transform:", tree);
+    menuItems.value = transformItems(tree);
+    console.log("✅ Final menu items:", menuItems.value);
+    expandActiveParents();
+  } catch (e) {
+    console.error("❌ Sidebar menu error:", e);
+    menuItems.value = [];
+  }
 };
+
+const toggle = (id) => {
+  openMap.value[id] = !openMap.value[id];
+};
+
+const isOpen = (id) => {
+  return !!openMap.value[id];
+};
+
+const linkClasses = (path) => {
+  const active = isActivePath(path);
+  return active
+    ? "bg-indigo-50 text-indigo-600 font-semibold shadow-sm"
+    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900";
+};
+
+watch(
+  () => route.path,
+  () => {
+    expandActiveParents();
+  }
+);
+
+onMounted(() => {
+  fetchMenu();
+});
 </script>
 
 <style scoped>

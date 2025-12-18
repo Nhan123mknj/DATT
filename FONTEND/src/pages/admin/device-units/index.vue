@@ -39,7 +39,7 @@
         </div>
       </div>
 
-      <LoadingSkeleton v-if="isLoading" />
+      <TableLoading v-if="isLoading" />
       <div v-else>
         <Table :data="units" :headers="headers">
           <template #device="{ item }">
@@ -193,12 +193,11 @@
 import { reactive, ref, computed, onMounted } from "vue";
 import Table from "../../../components/common/Table.vue";
 import Button from "../../../components/common/Button.vue";
-import LoadingSkeleton from "../../../components/common/LoadingSkeleton.vue";
+import TableLoading from "../../../components/common/TableLoading.vue";
 import Pagination from "../../../components/common/Pagination.vue";
 import Modal from "../../../components/Modal.vue";
 import SearchBar from "../../../components/common/SearchBar.vue";
 import Dropdown from "../../../components/common/Dropdown.vue";
-import { deviceUnitsService } from "../../../services/devices/deviceUnitsService";
 import { devicesService } from "../../../services/devices/devicesService";
 import { useDeviceUnits } from "../../../composables/fetchData/admin/useDeviceUnits";
 import { useForm } from "../../../composables/useForm";
@@ -207,31 +206,28 @@ export default {
   components: {
     Table,
     Button,
-    LoadingSkeleton,
+    TableLoading,
     Pagination,
     Modal,
     SearchBar,
     Dropdown,
   },
   setup() {
-    const filters = reactive({
-      search: "",
-      device_id: "",
-      status: "",
-    });
-
     const devices = ref([]);
 
     const {
-      deviceUnits,
+      units,
       isLoading,
       pagination,
       loadDeviceUnits,
       deleteDeviceUnit,
+      filters,
+      addUnit,
+      updateUnit,
     } = useDeviceUnits();
 
     const handleLoadUnits = (page = 1) => {
-      loadDeviceUnits(page, filters);
+      loadDeviceUnits(page);
     };
 
     const {
@@ -244,8 +240,16 @@ export default {
       closeModal,
       save,
     } = useForm({
-      createData: (data) => deviceUnitsService.create(data),
-      updateData: (id, data) => deviceUnitsService.update(id, data),
+      createData: async (data) => {
+        const success = await addUnit(data);
+        if (!success) throw new Error("Failed to create");
+        return { success: true };
+      },
+      updateData: async (id, data) => {
+        const success = await updateUnit(id, data);
+        if (!success) throw new Error("Failed to update");
+        return { success: true };
+      },
       initialForm: {
         id: null,
         device_id: "",
@@ -331,7 +335,7 @@ export default {
 
     return {
       filters,
-      units: deviceUnits,
+      units,
       isLoading,
       pagination,
       loadData: handleLoadUnits,

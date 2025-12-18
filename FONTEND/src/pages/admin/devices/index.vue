@@ -66,7 +66,7 @@
         </div>
       </div>
 
-      <LoadingSkeleton v-if="isLoading" />
+      <TableLoading v-if="isLoading" />
       <div v-else>
         <Table
           :data="devices"
@@ -89,8 +89,33 @@
               {{ item.is_active ? "Kích hoạt" : "Tạm dừng" }}
             </span>
           </template>
-          <template #total_units="{ item }">
-            {{ item.units?.length ?? 0 }}
+          <template #stats="{ item }">
+            <div class="flex flex-wrap gap-2">
+              <span
+                class="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                title="Tổng số lượng"
+              >
+                Tổng: {{ item.total_units || 0 }}
+              </span>
+              <span
+                class="px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                title="Đang mượn"
+              >
+                Mượn: {{ item.units_in_use_count || 0 }}
+              </span>
+              <span
+                class="px-2 py-1 rounded text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-100"
+                title="Đang đặt trước"
+              >
+                Đặt: {{ item.units_reserved_count || 0 }}
+              </span>
+              <span
+                class="px-2 py-1 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-100"
+                title="Đang bảo trì"
+              >
+                Bảo trì: {{ item.units_maintenance_count || 0 }}
+              </span>
+            </div>
           </template>
           <template #actions="{ item }">
             <div class="flex gap-2">
@@ -117,109 +142,13 @@
       </div>
     </div>
 
-    <ModalForm
+    <DeviceFormModal
       :show="showModal"
-      :title="modalTitle"
+      :device="editingDevice"
+      :categories="categories"
       @close="closeModal"
-      @submit="saveDevice"
-    >
-      <div class="space-y-4">
-        <div>
-          <label class="text-sm font-medium text-gray-700">Tên thiết bị</label>
-          <input
-            v-model="form.name"
-            type="text"
-            class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-          />
-          <p v-if="errors.name" class="text-xs text-red-500 mt-1">
-            {{ errors.name?.[0] || errors.name }}
-          </p>
-        </div>
-        <div class="grid gap-4 md:grid-cols-2">
-          <div>
-            <label class="text-sm font-medium text-gray-700">Danh mục</label>
-            <select
-              v-model="form.category_id"
-              class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            >
-              <option value="">-- Chọn danh mục --</option>
-              <option
-                v-for="category in categories"
-                :key="category.id"
-                :value="category.id"
-              >
-                {{ category.name }}
-              </option>
-            </select>
-            <p v-if="errors.category_id" class="text-xs text-red-500 mt-1">
-              {{ errors.category_id?.[0] || errors.category_id }}
-            </p>
-          </div>
-          <div>
-            <label class="text-sm font-medium text-gray-700"
-              >Nhà sản xuất</label
-            >
-            <input
-              v-model="form.manufacturer"
-              type="text"
-              class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            />
-            <p v-if="errors.manufacturer" class="text-xs text-red-500 mt-1">
-              {{ errors.manufacturer?.[0] || errors.manufacturer }}
-            </p>
-          </div>
-        </div>
-        <div class="grid gap-4 md:grid-cols-2">
-          <div>
-            <label class="text-sm font-medium text-gray-700">Model</label>
-            <input
-              v-model="form.model"
-              type="text"
-              class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            />
-            <p v-if="errors.model" class="text-xs text-red-500 mt-1">
-              {{ errors.model?.[0] || errors.model }}
-            </p>
-          </div>
-          <div>
-            <label class="text-sm font-medium text-gray-700">Trạng thái</label>
-            <select
-              v-model="form.is_active"
-              class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            >
-              <option :value="1">Kích hoạt</option>
-              <option :value="0">Tạm dừng</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label class="text-sm font-medium text-gray-700">Thông số</label>
-          <textarea
-            v-model="form.specifications"
-            rows="3"
-            class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            placeholder="CPU, RAM, Bộ nhớ..."
-          ></textarea>
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex gap-3">
-          <button
-            type="button"
-            class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600"
-            @click="closeModal"
-          >
-            Hủy
-          </button>
-          <button
-            type="submit"
-            class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500"
-          >
-            {{ modalMode === "create" ? "Thêm mới" : "Cập nhật" }}
-          </button>
-        </div>
-      </template>
-    </ModalForm>
+      @saved="onSaved"
+    />
   </div>
 </template>
 
@@ -228,19 +157,17 @@ import { ref, reactive, computed, onMounted, watch } from "vue";
 
 import Table from "../../../components/common/Table.vue";
 import Button from "../../../components/common/Button.vue";
-import LoadingSkeleton from "../../../components/common/LoadingSkeleton.vue";
+import TableLoading from "../../../components/common/TableLoading.vue";
 import Pagination from "../../../components/common/Pagination.vue";
-import ModalForm from "../../../components/ModalForm.vue";
 import SearchBar from "../../../components/common/SearchBar.vue";
 import Dropdown from "../../../components/common/Dropdown.vue";
+import DeviceFormModal from "../../../components/admin/device/DeviceFormModal.vue";
 
-import { devicesService } from "../../../services/devices/devicesService";
-import { deviceCategoriesService } from "../../../services/devices/deviceCategoriesService";
+import { deviceService as devicesService } from "../../../services/admin/deviceService";
+import { deviceCategoryService as deviceCategoriesService } from "../../../services/admin/deviceCategoryService";
 
 import { useToast } from "vue-toastification";
 import { useDevices } from "../../../composables/fetchData/admin/useDevices";
-import { useForm } from "../../../composables/useForm";
-import { useDeviceFilters } from "../../../composables/filter/useDeviceFilter";
 
 export default {
   name: "Devices",
@@ -248,17 +175,24 @@ export default {
   components: {
     Table,
     Button,
-    LoadingSkeleton,
+    TableLoading,
     Pagination,
-    ModalForm,
     SearchBar,
     Dropdown,
+    DeviceFormModal,
   },
 
   setup() {
     const toast = useToast();
 
-    const { filters, resetFilters, buildParams } = useDeviceFilters();
+    const {
+      devices,
+      isLoading,
+      pagination,
+      loadDevices,
+      deleteDevice,
+      filters,
+    } = useDevices();
 
     const categories = ref([]);
 
@@ -271,39 +205,31 @@ export default {
       }
     };
 
-    const { devices, isLoading, pagination, loadDevices, deleteDevice } =
-      useDevices();
-
     const handleLoadDevices = (page = 1) => {
-      loadDevices(page, filters);
+      loadDevices(page);
     };
 
-    const {
-      form,
-      errors,
-      showModal,
-      modalMode,
-      openCreate,
-      openEdit,
-      closeModal,
-      save,
-    } = useForm({
-      createData: (data) => devicesService.create(data),
-      updateData: (id, data) => devicesService.update(id, data),
-      initialForm: {
-        id: null,
-        name: "",
-        category_id: "",
-        manufacturer: "",
-        model: "",
-        specifications: "",
-        is_active: 1,
-      },
-    });
+    const showModal = ref(false);
+    const editingDevice = ref(null);
 
-    const modalTitle = computed(() =>
-      modalMode.value === "create" ? "Thêm thiết bị" : "Cập nhật thiết bị"
-    );
+    const openCreate = () => {
+      editingDevice.value = null;
+      showModal.value = true;
+    };
+
+    const openEdit = (item) => {
+      editingDevice.value = item;
+      showModal.value = true;
+    };
+
+    const closeModal = () => {
+      showModal.value = false;
+      editingDevice.value = null;
+    };
+
+    const onSaved = () => {
+      handleLoadDevices(pagination.current_page);
+    };
 
     const selectedDevices = ref([]);
 
@@ -338,22 +264,24 @@ export default {
       handleLoadDevices();
     };
 
-    const saveDevice = () => {
-      save(() => handleLoadDevices(pagination.current_page));
+    const resetFilters = () => {
+      filters.search = "";
+      filters.category_id = "";
+      filters.is_active = undefined;
+      handleLoadDevices();
     };
 
     const statusOptions = [
-      { value: 1, label: "Kích hoạt" },
-      { value: 0, label: "Tạm dừng" },
+      { value: true, label: "Kích hoạt" },
+      { value: false, label: "Tạm dừng" },
     ];
 
     const headers = {
       name: "Tên thiết bị",
       category: "Danh mục",
       manufacturer: "Nhà sản xuất",
-      model: "Model",
       is_active: "Trạng thái",
-      total_units: "Số lượng",
+      stats: "Thống kê (Tổng/Mượn/Đặt/Bảo trì)",
     };
 
     onMounted(() => {
@@ -376,15 +304,12 @@ export default {
           handleLoadDevices(pagination.current_page);
         }
       },
-      form,
-      errors,
       showModal,
-      modalMode,
+      editingDevice,
       openCreate,
       openEdit,
       closeModal,
-      saveDevice,
-      modalTitle,
+      onSaved,
       selectedDevices,
       deleteSelected,
       handleSearch,

@@ -25,7 +25,9 @@ class Borrows extends Model
         'return_notes',
         'returned_by_staff_id',
         'return_slip_pdf_path',
-        'return_slip_generated_at'
+        'return_slip_generated_at',
+        'created_by_user_id',
+        'issued_by_user_id',
     ];
 
     public function borrower()
@@ -41,5 +43,15 @@ class Borrows extends Model
     public function returnedByStaff()
     {
         return $this->belongsTo(User::class, 'returned_by_staff_id');
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function issuedBy()
+    {
+        return $this->belongsTo(User::class, 'issued_by_user_id');
     }
 }

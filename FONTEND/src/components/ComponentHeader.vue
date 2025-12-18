@@ -135,7 +135,7 @@
 </template>
 
 <script>
-import authService from "../services/auth/authService.js";
+import { useAuthStore } from "../stores/authStore";
 import NotificationDropdown from "./common/NotificationDropdown.vue";
 import { useUserAccount } from "../composables/useUserAccount.js";
 import { useUserHelpers } from "../composables/useUserHelpers.js";
@@ -151,9 +151,10 @@ export default {
     const { getInitials } = useUserHelpers();
     const router = useRouter();
     const route = useRoute();
+    const authStore = useAuthStore();
 
     const handleLogout = async () => {
-      await authService.logout();
+      await authStore.logout();
       router.push({ name: "login" });
     };
 

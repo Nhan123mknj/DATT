@@ -3,17 +3,20 @@
 namespace App\Services;
 
 use App\Events\CreateBorrowingSlip;
-
+use App\Mail\IssueOtpMail;
 use App\Models\Borrows;
 use App\Models\BorrowsDetail;
+use App\Models\DeviceMaintenance;
 use App\Models\DeviceUnits;
 use App\Models\User;
 use App\Services\BaseService;
 
 use App\Services\Borrow\BorrowStrategyFactory;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class BorrowService extends BaseService
@@ -25,6 +28,8 @@ class BorrowService extends BaseService
             'borrower.student:user_id,student_code,grade_level,class_name',
             'borrower.teacher:user_id,teacher_code,department,position',
             'details.deviceUnit.device',
+            'createdBy:id,name',
+            'issuedBy:id,name',
         ]);
 
 
@@ -88,7 +93,10 @@ class BorrowService extends BaseService
                     ]);
                 }
 
-                $initialStatus = $autoApprove ? 'borrowed' : 'pending';
+                $initialStatus = $autoApprove ? 'approved' : ($fromReservation ? 'pending' : 'pending');
+
+
+                $creatorId = $fromReservation ? null : auth()->id();
 
                 $borrow = Borrows::create([
                     'borrower_id' => $userId,
@@ -97,6 +105,7 @@ class BorrowService extends BaseService
                     'status' => $initialStatus,
                     'notes' => $data['notes'] ?? null,
                     'commitment_file' => $data['commitment_file'] ?? null,
+                    'created_by_user_id' => $creatorId,
                 ]);
 
                 $devices->each(function ($deviceData) use ($borrow, $deviceUnits, $expectedReturn, $userId, $fromReservation, $autoApprove) {
@@ -133,16 +142,21 @@ class BorrowService extends BaseService
                     }
 
                     if ($autoApprove) {
-                        $result['status'] = 'borrowed';
-                        $deviceUnit->status = 'borrowed';
-                        $deviceUnit->save();
+
+                        if (!$fromReservation) {
+                            $deviceUnit->status = 'reserved';
+                            $deviceUnit->save();
+                        }
                     }
+
+
+                    $detailStatus = $autoApprove ? 'pending' : ($result['status'] ?? 'pending');
 
                     BorrowsDetail::create([
                         'borrow_id' => $borrow->id,
                         'device_unit_id' => $deviceUnitId,
-                        'status' => $result['status'] ?? 'pending',
-                        'condition_at_borrow' => $deviceData['condition_at_borrow'] ?? 'tốt',
+                        'status' => $detailStatus,
+                        'condition_at_borrow' => $deviceData['condition_at_borrow'] ?? 'good',
                         'deposit_amount' => $result['deposit_amount'] ?? 0,
                     ]);
                 });
@@ -168,7 +182,9 @@ class BorrowService extends BaseService
             'borrower:id,name,email,phone',
             'details:id,borrow_id,device_unit_id',
             'details.deviceUnit:id,device_id,serial_number',
-            'details.deviceUnit.device:id,name'
+            'details.deviceUnit.device:id,name',
+            'createdBy:id,name',
+            'issuedBy:id,name',
         ])->findOrFail($id);
 
         Gate::authorize('view', $result);
@@ -201,25 +217,79 @@ class BorrowService extends BaseService
         });
     }
 
-    public function issueBorrow(int $borrowId)
+    public function sendIssueOtp(int $borrowId)
     {
-        return $this->runInTransactionWithRetry(function () use ($borrowId) {
+        $borrow = Borrows::with('borrower')->findOrFail($borrowId);
+
+        if ($borrow->status !== 'approved') {
+            throw ValidationException::withMessages(['Phiếu không ở trạng thái chờ xuất kho.']);
+        }
+
+        $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        $key = "issue_otp_{$borrowId}";
+
+        Cache::put($key, $otp, now()->addMinutes(5));
+
+        Mail::to($borrow->borrower->email)->queue(new IssueOtpMail($borrow, $otp));
+
+        return [
+            'message' => 'Mã OTP đã được gửi đến email người mượn.',
+            'email' => $borrow->borrower->email
+        ];
+    }
+
+    public function sendReturnOtp(int $borrowId)
+    {
+        $borrow = Borrows::with('borrower')->findOrFail($borrowId);
+
+        if (!in_array($borrow->status, ['borrowed', 'overdue'])) {
+            throw ValidationException::withMessages(['Phiếu không ở trạng thái có thể trả.']);
+        }
+
+        $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        $key = "return_otp_{$borrowId}";
+
+        Cache::put($key, $otp, now()->addMinutes(5));
+
+        Mail::to($borrow->borrower->email)->queue(new \App\Mail\ReturnOtpMail($borrow, $otp));
+
+        return [
+            'message' => 'Mã OTP đã được gửi đến email người mượn.',
+            'email' => $borrow->borrower->email
+        ];
+    }
+
+    public function issueBorrow(int $borrowId, ?string $otp = null)
+    {
+        return $this->runInTransactionWithRetry(function () use ($borrowId, $otp) {
             $borrow = Borrows::with(['details', 'borrower'])->lockForUpdate()->findOrFail($borrowId);
 
             Gate::authorize('issue', $borrow);
 
+            if ($borrow->status === 'approved') {
+                if (empty($otp)) {
+                    throw ValidationException::withMessages(['otp' => 'Vui lòng nhập mã OTP xác thực.']);
+                }
+
+                $key = "issue_otp_{$borrowId}";
+                $cachedOtp = Cache::get($key);
+
+                if (!$cachedOtp || $cachedOtp !== $otp) {
+                    throw ValidationException::withMessages(['otp' => 'Mã OTP không chính xác hoặc đã hết hạn.']);
+                }
+
+                Cache::forget($key);
+            }
+
             if (!in_array($borrow->status, ['approved', 'borrowed'], true)) {
                 throw ValidationException::withMessages(['Phieu khong o trang thai co the xuat.']);
             }
-
-            // Re-check if user is still active before issuing
             if (!$borrow->borrower->is_active) {
                 throw ValidationException::withMessages([
                     'user' => 'Tài khoản người mượn đã bị tạm ngừng. Không thể xuất thiết bị.'
                 ]);
             }
 
-            // Validate expected_return_date is still in the future
             if ($borrow->expected_return_date && \Carbon\Carbon::parse($borrow->expected_return_date)->isPast()) {
                 throw ValidationException::withMessages([
                     'expected_return_date' => 'Ngày dự kiến trả đã quá hạn. Vui lòng cập nhật ngày trả mới.'
@@ -232,8 +302,6 @@ class BorrowService extends BaseService
                 if ($detail->status === 'borrowed') {
                     continue;
                 }
-
-
                 if (!in_array($unit->status, ['available', 'reserved'])) {
                     throw ValidationException::withMessages([
                         "devices" => "Thiết bị #{$unit->id} không khả dụng (status: {$unit->status})."
@@ -244,11 +312,24 @@ class BorrowService extends BaseService
                 $unit->save();
 
                 $detail->status = 'borrowed';
+
+
+                if ($unit->device && $unit->device->category_id == 1) {
+                    $unit->status = 'consumed';
+                    $unit->save();
+                    $unit->delete();
+
+                    $detail->status = 'returned';
+                    $detail->returned_at = now();
+                    $detail->notes = 'Tiêu hao khi xuất kho';
+                }
+
                 $detail->save();
             }
 
             $borrow->status = 'borrowed';
             $borrow->borrowed_date = $borrow->borrowed_date ?? now();
+            $borrow->issued_by_user_id = auth()->id();
             $borrow->save();
 
             DB::afterCommit(function () use ($borrow) {
@@ -262,13 +343,13 @@ class BorrowService extends BaseService
     public function createReturnSlip(
         int $borrowId,
         array $returnItems,
-        array $signatures = [],
+        string $otp,
         ?string $notes = null
     ) {
         return $this->runInTransactionWithRetry(function () use (
             $borrowId,
             $returnItems,
-            $signatures,
+            $otp,
             $notes
         ) {
             $borrow = Borrows::with('details.deviceUnit.device')
@@ -276,6 +357,17 @@ class BorrowService extends BaseService
                 ->findOrFail($borrowId);
 
             Gate::authorize('return', $borrow);
+
+            $key = "return_otp_{$borrowId}";
+            $cachedOtp = Cache::get($key);
+
+            if (!$cachedOtp || $cachedOtp !== $otp) {
+                throw ValidationException::withMessages([
+                    'otp' => 'Mã OTP không chính xác hoặc đã hết hạn.'
+                ]);
+            }
+
+            Cache::forget($key);
 
             if (!in_array($borrow->status, ['approved', 'borrowed', 'overdue'], true)) {
                 throw ValidationException::withMessages([
@@ -299,16 +391,21 @@ class BorrowService extends BaseService
                 ->exists();
 
             if ($allReturned) {
-                \Log::info('All items returned. Processing signatures...');
-                if (!empty($signatures['staff'])) {
-                    $path = $this->saveSignatureImage($signatures['staff'], 'staff_signatures');
-                    \Log::info('Staff signature saved at: ' . $path);
-                    $borrow->staff_signature = $path;
-                }
-                if (!empty($signatures['borrower'])) {
-                    $path = $this->saveSignatureImage($signatures['borrower'], 'borrower_signatures');
-                    \Log::info('Borrower signature saved at: ' . $path);
-                    $borrow->borrower_signature = $path;
+                $scoreChange = $this->calculateCreditScoreChange($borrow, $returnItems);
+                if ($scoreChange !== 0) {
+                    $borrower = $borrow->borrower;
+                    $oldScore = $borrower->credit_score;
+                    $newScore = max(0, min(100, $oldScore + $scoreChange));
+
+                    $borrower->credit_score = $newScore;
+                    $borrower->save();
+
+                    $borrower->notify(new \App\Notifications\CreditScoreChanged(
+                        $oldScore,
+                        $newScore,
+                        $scoreChange,
+                        $this->getCreditScoreChangeReason($borrow, $returnItems)
+                    ));
                 }
 
                 $borrow->return_notes = $notes;
@@ -316,32 +413,27 @@ class BorrowService extends BaseService
                 $borrow->actual_return_date = now();
                 $borrow->returned_by_staff_id = auth()->id();
                 $borrow->save();
-
-                DB::afterCommit(function () use ($borrow) {
-                    try {
-                        \Log::info('Generating PDF for borrow ' . $borrow->id);
-                        $pdfService = app(\App\Services\ReturnSlipPDFService::class);
-                        $path = $pdfService->generate($borrow);
-                        \Log::info('PDF generated at: ' . $path);
-                    } catch (\Exception $e) {
-                        \Log::error('PDF generation failed: ' . $e->getMessage());
-                        \Log::error($e->getTraceAsString());
-                    }
-                });
             }
 
             return $borrow->fresh()->load('details.deviceUnit.device');
         });
     }
 
-    /**
-     * Process individual device return
-     */
     private function processDeviceReturn(Borrows $borrow, array $item, $details)
     {
         $detail = $details[$item['device_unit_id']] ?? null;
 
-        if (!$detail || !in_array($detail->status, ['pending', 'borrowed'])) {
+        if (!$detail) {
+            throw ValidationException::withMessages([
+                'error' => "Không tìm thấy chi tiết mượn cho thiết bị #{$item['device_unit_id']}."
+            ]);
+        }
+
+        if ($detail->status === 'returned') {
+            return;
+        }
+
+        if (!in_array($detail->status, ['pending', 'borrowed'])) {
             throw ValidationException::withMessages([
                 'error' => "Thiết bị #{$item['device_unit_id']} không ở trạng thái đang mượn."
             ]);
@@ -349,50 +441,38 @@ class BorrowService extends BaseService
 
         $unit = DeviceUnits::lockForUpdate()->findOrFail($item['device_unit_id']);
 
-        // Skip if already returned
         if ($detail->status === 'returned' && $unit->status === 'available') {
             return;
         }
 
-        // Check condition & set appropriate status
         $condition = $item['condition_at_return'];
 
         if (in_array($condition, ['damaged', 'broken'])) {
             $unit->status = 'under_maintenance';
 
-            // Calculate damage fee
-            $detail->damage_fee = $this->calculateDamageFee($unit, $condition);
+            DeviceMaintenance::create([
+                'device_unit_id' => $unit->id,
+                'type' => 'damage_report',
+                'reported_by' => auth()->id(),
+                'priority' => $condition === 'broken' ? 'urgent' : 'high',
+                'status' => 'pending',
+                'description' => "Thiết bị bị {$this->getConditionLabel($condition)} khi trả từ phiếu mượn #{$borrow->id}",
+                'notes' => "Người mượn: {$borrow->borrower->name}\nNgày trả: " . now()->format('d/m/Y H:i'),
+            ]);
         } else {
             $unit->status = 'available';
         }
 
         $unit->save();
 
-        // Update detail
         $detail->status = 'returned';
         $detail->returned_at = now();
         $detail->condition_at_return = $condition;
-
-        // Save photos if provided
         if (!empty($item['photos'])) {
             $detail->return_photos = json_encode($item['photos']);
         }
 
         $detail->save();
-    }
-
-    /**
-     * Calculate damage fee based on condition
-     */
-    private function calculateDamageFee(DeviceUnits $unit, string $condition): float
-    {
-        $baseCost = $unit->device->cost ?? 0;
-
-        return match ($condition) {
-            'damaged' => $baseCost * 0.2,  // 20% for minor damage
-            'broken' => $baseCost * 0.5,   // 50% for major damage
-            default => 0
-        };
     }
 
     public function rejectBorrowRequest(string $id)
@@ -403,34 +483,127 @@ class BorrowService extends BaseService
         return $borrow;
     }
 
-    private function saveSignatureImage($base64String, $folder)
+    public function cancelBorrow(string $id)
     {
-        if (empty($base64String)) return null;
+        return $this->runInTransactionWithRetry(function () use ($id) {
+            $borrow = Borrows::with('details')->lockForUpdate()->findOrFail($id);
 
-        $type = 'png'; // Default type
+            if (!in_array($borrow->status, ['pending', 'approved'])) {
+                throw ValidationException::withMessages(['Chỉ có thể hủy phiếu khi đang chờ duyệt hoặc đã duyệt.']);
+            }
 
-        // Check if it has data URI prefix
-        if (preg_match('/^data:image\/(\w+);base64,/', $base64String, $matches)) {
-            $type = strtolower($matches[1]);
-            $base64String = substr($base64String, strpos($base64String, ',') + 1);
+            if ($borrow->status === 'approved') {
+                foreach ($borrow->details as $detail) {
+                    $unit = DeviceUnits::lockForUpdate()->findOrFail($detail->device_unit_id);
+                    if ($unit->status === 'reserved') {
+                        $unit->status = 'available';
+                        $unit->save();
+                    }
+                }
+            }
+
+            $borrow->status = 'cancelled';
+            $borrow->save();
+
+            return $borrow;
+        });
+    }
+
+    private function getConditionLabel(string $condition): string
+    {
+        return match ($condition) {
+            'damaged' => 'hư hỏng nhẹ',
+            'broken' => 'hư hỏng nặng',
+            'lost' => 'mất',
+            default => 'không rõ'
+        };
+    }
+
+
+    private function calculateCreditScoreChange($borrow, $returnItems): int
+    {
+        $scoreChange = 0;
+
+        $expectedReturnDate = \Carbon\Carbon::parse($borrow->expected_return_date);
+        $actualReturnDate = now();
+        $daysLate = $actualReturnDate->diffInDays($expectedReturnDate, false);
+
+        if ($daysLate < 0) {
+            $daysLate = abs($daysLate);
+            if ($daysLate >= 1 && $daysLate <= 3) {
+                $scoreChange -= 5;
+            } elseif ($daysLate >= 4 && $daysLate <= 7) {
+                $scoreChange -= 10;
+            } elseif ($daysLate > 7) {
+                $scoreChange -= 20;
+            }
         }
 
-        if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
-            throw new \Exception('Invalid image type');
+        foreach ($returnItems as $item) {
+            $condition = $item['condition_at_return'];
+            switch ($condition) {
+                case 'damaged':
+                    $scoreChange -= 10;
+                    break;
+                case 'broken':
+                    $scoreChange -= 30;
+                    break;
+                case 'lost':
+                    $scoreChange -= 50;
+                    break;
+            }
         }
 
-        $decoded = base64_decode($base64String);
+        return $scoreChange;
+    }
 
-        if ($decoded === false) {
-            \Log::error('Base64 decode failed for signature');
-            return null;
+    /**
+     * Get human-readable reason for credit score change
+     */
+    private function getCreditScoreChangeReason($borrow, $returnItems): string
+    {
+        $reasons = [];
+
+        // Check late return
+        $expectedReturnDate = \Carbon\Carbon::parse($borrow->expected_return_date);
+        $actualReturnDate = now();
+        $daysLate = $actualReturnDate->diffInDays($expectedReturnDate, false);
+
+        if ($daysLate < 0) {
+            $daysLate = abs($daysLate);
+            $reasons[] = "Trả muộn {$daysLate} ngày";
         }
 
-        $fileName = uniqid() . '.' . $type;
-        $path = "signatures/{$folder}/{$fileName}";
+        // Check device conditions
+        $damagedCount = 0;
+        $brokenCount = 0;
+        $lostCount = 0;
 
-        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $decoded);
+        foreach ($returnItems as $item) {
+            $condition = $item['condition_at_return'];
+            switch ($condition) {
+                case 'damaged':
+                    $damagedCount++;
+                    break;
+                case 'broken':
+                    $brokenCount++;
+                    break;
+                case 'lost':
+                    $lostCount++;
+                    break;
+            }
+        }
 
-        return $path;
+        if ($damagedCount > 0) {
+            $reasons[] = "{$damagedCount} thiết bị bị hư hỏng nhẹ";
+        }
+        if ($brokenCount > 0) {
+            $reasons[] = "{$brokenCount} thiết bị bị hư hỏng nặng";
+        }
+        if ($lostCount > 0) {
+            $reasons[] = "{$lostCount} thiết bị bị mất";
+        }
+
+        return implode(', ', $reasons);
     }
 }
