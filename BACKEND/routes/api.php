@@ -59,10 +59,14 @@ Route::prefix('admin')->middleware(['auth:api', 'role:admin'])->group(function (
     Route::get('device/{id}', [DeviceController::class, 'show']);
     Route::put('device/{id}', [DeviceController::class, 'update']);
     Route::delete('device/{id}', [DeviceController::class, 'destroy']);
+    Route::get('device/export/excel', [DeviceController::class, 'export']);
+    Route::post('device/import/excel', [DeviceController::class, 'import']);
     // Route::get('device/{id}/preview-delete', [DeviceController::class, 'previewDelete']);
     // Route::get('device/{id}/edit', [DeviceController::class, 'edit']);
 
     Route::apiResource('device-units', DeviceUnitsController::class);
+    Route::get('device-units/export/excel', [DeviceUnitsController::class, 'export']);
+    Route::post('device-units/import/excel', [DeviceUnitsController::class, 'import']);
 
 
     Route::get('menus', [MenuController::class, 'index']);
@@ -82,6 +86,7 @@ Route::prefix('admin')->middleware(['auth:api', 'role:admin'])->group(function (
     Route::get('maintenances/{id}', [DeviceMaintenanceController::class, 'show']);
     Route::put('maintenances/{id}', [DeviceMaintenanceController::class, 'update']);
     Route::delete('maintenances/{id}', [DeviceMaintenanceController::class, 'destroy']);
+    Route::post('maintenances/{id}/complete', [DeviceMaintenanceController::class, 'complete']);
 });
 
 

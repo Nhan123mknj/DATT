@@ -97,4 +97,27 @@ class DeviceMaintenanceController extends Controller
 
         return response()->json(['message' => 'Maintenance record deleted successfully']);
     }
+
+    public function complete(string $id)
+    {
+        $maintenance = DeviceMaintenance::findOrFail($id);
+
+        if ($maintenance->status === 'completed') {
+            return response()->json(['message' => 'Maintenance already completed'], 400);
+        }
+
+        DB::transaction(function () use ($maintenance) {
+
+            $maintenance->update([
+                'status' => 'completed',
+                'end_date' => now(),
+            ]);
+            $maintenance->deviceUnit->update(['status' => 'available']);
+        });
+
+        return response()->json([
+            'message' => 'Maintenance completed successfully',
+            'maintenance' => $maintenance->load(['deviceUnit.device', 'reporter', 'assignee'])
+        ]);
+    }
 }

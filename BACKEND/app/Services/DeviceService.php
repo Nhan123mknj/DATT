@@ -14,14 +14,20 @@ class DeviceService
     public function listDevices($filters = [], $perPage = 15)
     {
         $query = Devices::with('category', 'units')
+            ->withCount(['units as total_units' => function ($query) {
+                $query->whereNull('deleted_at');
+            }])
             ->withCount(['units as units_in_use_count' => function ($query) {
-                $query->where('status', 'borrowed');
+                $query->where('status', 'borrowed')
+                    ->whereNull('deleted_at');
             }])
             ->withCount(['units as units_reserved_count' => function ($query) {
-                $query->where('status', 'reserved');
+                $query->where('status', 'reserved')
+                    ->whereNull('deleted_at');
             }])
             ->withCount(['units as units_maintenance_count' => function ($query) {
-                $query->where('status', 'under_maintenance');
+                $query->where('status', 'under_maintenance')
+                    ->whereNull('deleted_at');
             }]);
 
         $allowSortFields = [
@@ -54,6 +60,7 @@ class DeviceService
 
         return $query->paginate($perPage);
     }
+
     public function getDeviceById($id)
     {
         return Devices::with('category:id,name', 'units')->findOrFail($id);

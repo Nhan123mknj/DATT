@@ -110,4 +110,64 @@ class DeviceController extends Controller
             return response()->json(['error' => 'Failed to delete device: ' . $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Export devices to Excel
+     */
+    public function export()
+    {
+        try {
+            return \Maatwebsite\Excel\Facades\Excel::download(
+                new \App\Exports\DevicesExport,
+                'devices_' . date('Y-m-d_His') . '.xlsx'
+            );
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to export: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Import devices from Excel
+     */
+    public function import(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|mimes:xlsx,xls,csv|max:2048',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        try {
+            \Maatwebsite\Excel\Facades\Excel::import(
+                new \App\Imports\DevicesImport,
+                $request->file('file')
+            );
+
+            return response()->json([
+                'message' => 'Import thành công',
+            ], 200);
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errors = [];
+
+            foreach ($failures as $failure) {
+                $errors[] = [
+                    'row' => $failure->row(),
+                    'attribute' => $failure->attribute(),
+                    'errors' => $failure->errors(),
+                ];
+            }
+
+            return response()->json([
+                'message' => 'Import thất bại',
+                'errors' => $errors
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to import: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
