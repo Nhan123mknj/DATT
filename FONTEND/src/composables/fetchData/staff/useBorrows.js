@@ -23,6 +23,8 @@ export function useBorrows() {
             };
 
             const { data } = await staffBorrowService.list(params);
+            // console.log(data);
+            
             const payload = data.borrowSlip;
             borrows.value = payload?.data || [];
             pagination.current_page = payload?.current_page || 1;

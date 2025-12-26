@@ -74,7 +74,6 @@
         </div>
       </div>
 
-      <!-- Navigation Tabs -->
       <nav class="p-2" aria-label="Tabs">
         <button
           v-for="tab in tabs"
@@ -100,7 +99,6 @@ import { useUserHelpers } from "../../composables/useUserHelpers.js";
 import { useUserAvatar } from "../../composables/useUserAvatar.js";
 import { useUserAccount } from "../../composables/useUserAccount.js";
 
-// Props
 defineProps({
   activeTab: { type: String, required: true },
   tabs: { type: Array, required: true },

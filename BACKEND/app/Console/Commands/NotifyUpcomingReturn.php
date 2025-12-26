@@ -31,7 +31,7 @@ class NotifyUpcomingReturn extends Command
         // $today = now()->toDateString();
 
         $upcomingBorrows = Borrows::with(['borrower', 'details.deviceUnit.device'])
-            ->where('status', 'borrowed')
+            ->where('status', 'completed')
             ->whereDate('expected_return_date', $tomorrow)
             ->get();
 

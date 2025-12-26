@@ -13,7 +13,6 @@ class DeviceMaintenance extends Model
     protected $fillable = [
         'device_unit_id',
         'reported_by',
-        'assigned_to',
         'type',
         'status',
         'priority',
@@ -40,10 +39,5 @@ class DeviceMaintenance extends Model
     public function reporter()
     {
         return $this->belongsTo(User::class, 'reported_by');
-    }
-
-    public function assignee()
-    {
-        return $this->belongsTo(User::class, 'assigned_to');
     }
 }

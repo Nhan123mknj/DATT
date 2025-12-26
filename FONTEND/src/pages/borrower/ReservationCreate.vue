@@ -12,12 +12,10 @@
         </p>
       </div>
       <div class="flex gap-3">
-        <Button
-          color="secondary"
-          @click="goBack"
-          class="hover:bg-gray-100 border-gray-200"
-        >
-          <font-awesome-icon icon="arrow-left" class="mr-2" />
+        <Button @click="goBack" color="secondary" label="Trở lại danh sách">
+          <template #icon>
+            <font-awesome-icon icon="arrow-left" />
+          </template>
           Trở lại danh sách
         </Button>
       </div>
@@ -27,7 +25,6 @@
       class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-8"
     >
       <form class="space-y-8" @submit.prevent="submitReservation">
-        <!-- Thông tin thời gian -->
         <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-6">
           <h3 class="text-base font-bold text-gray-900 mb-4 flex items-center">
             <div
@@ -76,8 +73,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Danh sách thiết bị -->
         <div>
           <div class="flex items-center justify-between mb-6">
             <h3 class="text-base font-bold text-gray-900 flex items-center">
@@ -388,7 +383,6 @@
           </div>
         </div>
 
-        <!-- Thông tin bổ sung -->
         <div class="bg-gray-50 border border-gray-200 rounded-xl p-6">
           <h3 class="text-base font-bold text-gray-900 mb-4 flex items-center">
             <div
@@ -755,7 +749,6 @@ export default {
         form.reserved_until = formatDateForInput(reservation.reserved_until);
         form.notes = reservation.notes;
 
-        // Reconstruct device groups
         const groups = {};
         reservation.details.forEach((detail) => {
           const deviceId = detail.device_unit.device_id;
@@ -914,7 +907,6 @@ export default {
       } catch (error) {
         if (error.response && error.response.status === 422) {
           errors.value = error.response.data.errors || {};
-          // toast.error("Vui lòng kiểm tra lại thông tin");
         } else {
           if (isEditMode.value) {
             toast.error("Cập nhật đặt trước thất bại");

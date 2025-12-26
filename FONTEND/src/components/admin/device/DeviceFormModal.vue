@@ -62,6 +62,22 @@
           </p>
         </div>
         <div>
+          <label class="text-sm font-medium text-gray-700">Giá (VNĐ)</label>
+          <input
+            v-model.number="form.price"
+            type="number"
+            min="0"
+            step="1000"
+            placeholder="Nhập giá thiết bị"
+            class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
+          />
+          <p v-if="errors.price" class="text-xs text-red-500 mt-1">
+            {{ errors.price?.[0] || errors.price }}
+          </p>
+        </div>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        <div>
           <label class="text-sm font-medium text-gray-700">Trạng thái</label>
           <select
             v-model="form.is_active"
@@ -167,6 +183,7 @@ const form = reactive({
   category_id: "",
   manufacturer: "",
   model: "",
+  price: null,
   specifications: null,
   is_active: true,
 });
@@ -179,6 +196,7 @@ const resetForm = () => {
   form.category_id = "";
   form.manufacturer = "";
   form.model = "";
+  form.price = null;
   form.specifications = null;
   form.is_active = true;
   specList.value = [{ key: "", value: "" }];

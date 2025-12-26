@@ -76,6 +76,7 @@ export const useUserStore = defineStore("user", () => {
       name: "",
       email: "",
       role: "",
+      credit_score: 0,
       is_active: 1,
     };
     errors.value = {};
@@ -90,6 +91,7 @@ export const useUserStore = defineStore("user", () => {
       name: user.name,
       email: user.email,
       role: user.role,
+      credit_score: user.credit_score,
       is_active: user.is_active,
     };
     errors.value = {};

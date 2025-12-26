@@ -19,14 +19,17 @@ export function useBorrowReturn(loadBorrows, pagination) {
     returnOtp.value = ''
     returnError.value = ''
     
-    // Initialize return items from borrow details
     returnItems.value = borrow.details.map(detail => ({
+      borrow_detail_id: detail.id,
       device_unit_id: detail.device_unit_id,
       device_name: detail.device_unit?.device?.name,
       serial_number: detail.device_unit?.serial_number,
-      condition_at_return: 'good', // Default
-      status: detail.status // Keep track of current status
-    })).filter(item => ['borrowed', 'pending'].includes(item.status))
+      condition_status: 'good',
+      condition_notes: '',
+      damage_description: '',
+      damage_fee: 0,
+      status: detail.status
+    })).filter(item => item.status !== 'returned')
 
     // Send OTP
     try {
@@ -55,12 +58,18 @@ export function useBorrowReturn(loadBorrows, pagination) {
 
     returnLoading.value = true
     try {
+      // NEW API format
       await staffBorrowService.return(returnTarget.value.id, {
         otp: returnOtp.value,
-        notes: returnNotes.value,
-        return_items: returnItems.value.map(item => ({
+        overall_condition: 'good',
+        condition_notes: returnNotes.value,
+        devices: returnItems.value.map(item => ({
+          borrow_detail_id: item.borrow_detail_id,
           device_unit_id: item.device_unit_id,
-          condition_at_return: item.condition_at_return,
+          condition_status: item.condition_status,
+          condition_notes: item.condition_notes || null,
+          damage_description: item.damage_description || null,
+          damage_fee: item.damage_fee || 0,
         })),
       })
       toast.success('Đã xử lý trả thiết bị thành công')

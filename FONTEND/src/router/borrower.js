@@ -43,6 +43,12 @@ const borrower = [
         component: () => import('../layout/AccountLayout.vue'),
         meta: { title: 'Tài khoản của tôi' },
       },
+      {
+        path: 'returns',
+        name: 'borrower.returns',
+        component: () => import('../pages/borrower/ReturnSlip.vue'),
+        meta: { title: 'Phiếu trả của tôi' },
+      }
     ],
   },
 ]

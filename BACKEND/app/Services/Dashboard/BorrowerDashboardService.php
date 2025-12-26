@@ -2,6 +2,7 @@
 
 namespace App\Services\Dashboard;
 
+use App\Models\Borrows;
 use Illuminate\Support\Facades\DB;
 
 class BorrowerDashboardService
@@ -68,10 +69,10 @@ class BorrowerDashboardService
         $result = DB::selectOne("
             SELECT 
                 COUNT(*) as total_borrows,
-                COUNT(CASE WHEN status = 'borrowed' THEN 1 END) as active_borrows,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as active_borrows,
                 COUNT(CASE WHEN status = 'returned' THEN 1 END) as returned_borrows,
-                COUNT(CASE WHEN status = 'borrowed' AND expected_return_date < NOW() THEN 1 END) as overdue_borrows,
-                COUNT(CASE WHEN status = 'borrowed' AND expected_return_date >= NOW() THEN 1 END) as on_time_borrows
+                COUNT(CASE WHEN status = 'completed' AND expected_return_date < NOW() THEN 1 END) as overdue_borrows,
+                COUNT(CASE WHEN status = 'completed' AND expected_return_date >= NOW() THEN 1 END) as on_time_borrows
             FROM borrows
             WHERE borrower_id = ?
         ", [$userId]);
@@ -144,6 +145,7 @@ class BorrowerDashboardService
             ORDER BY total_borrows DESC
             LIMIT 5
         ", [$userId]);
+
 
         return array_map(function ($item) {
             return [

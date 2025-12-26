@@ -53,7 +53,7 @@ export const useReservationStore = defineStore("reservation", () => {
       const response = await reservationsService.create(data);
       toast.success("Tạo yêu cầu đặt trước thành công");
       
-      // Update device unit statuses if they are in the deviceUnitStore
+
       if (data.devices && Array.isArray(data.devices)) {
           data.devices.forEach(device => {
               if (device.device_unit_id) {
@@ -62,7 +62,7 @@ export const useReservationStore = defineStore("reservation", () => {
           });
       }
 
-      // Refresh list
+
       fetchReservations(1);
       return response;
     } catch (error) {
@@ -77,11 +77,6 @@ export const useReservationStore = defineStore("reservation", () => {
     try {
       await reservationsService.cancel(reservationId);
       toast.success("Đã hủy yêu cầu");
-      
-      // We might want to fetch the reservation details first to know which units to free up, 
-      // but for now, just refreshing the list is the primary goal. 
-      // Ideally, the backend handles the status update, and we just refresh the UI.
-      // If we wanted optimistic UI updates, we'd need to know the units.
       
       fetchReservations(pagination.current_page);
       return true;

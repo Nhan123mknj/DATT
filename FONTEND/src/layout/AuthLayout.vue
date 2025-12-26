@@ -65,7 +65,7 @@
         class="bg-blue-500 rounded-r-2xl border-black flex items-center justify-center"
       >
         <img
-          src="https://elearning.vinhuni.edu.vn/pluginfile.php/1/theme_klass/logo/1736161506/logo.png"
+          src="https://scontent.fhan4-5.fna.fbcdn.net/v/t39.30808-6/299684126_173020238585811_2501080611153189874_n.jpg?_nc_cat=102&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=eAxHggO-uEwQ7kNvwHWzQhk&_nc_oc=AdnSsY8z10wPJYT21CNIc_clJBMMQopG1ag8cSJNcfDAhnAn75TYakGRWS4SEtB5ndU&_nc_zt=23&_nc_ht=scontent.fhan4-5.fna&_nc_gid=tfmrC5xXrGCg0sSuYWbUCg&oh=00_Afl08oStgSC97F4OfQmVyyqdU3qxDEfROsYpi-GdVnxojQ&oe=6953E1A7"
           alt=""
           class="h-40 w-40"
         />

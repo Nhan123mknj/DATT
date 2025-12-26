@@ -39,7 +39,7 @@
       </StatCard>
       <StatCard
         label="Danh mục thiết bị"
-        :value="stats.categories"
+        :value="stats.devices"
         description="Nhóm thiết bị đang hoạt động"
       >
         <template #icon>
@@ -48,7 +48,7 @@
       </StatCard>
       <StatCard
         label="Thiết bị"
-        :value="stats.devices"
+        :value="stats.devices_unit"
         description="Số thiết bị đang quản lý"
       >
         <template #icon>
@@ -165,8 +165,8 @@ import { RouterLink } from "vue-router";
 import StatCard from "../../components/common/StatCard.vue";
 import { useDeviceCategoryStore } from "../../stores/deviceCategoryStore";
 import { useDeviceStore } from "../../stores/deviceStore";
-import { usersService } from "../../services/admin/usersService";
 import { reservationsService } from "../../services/admin/reservationsSevice";
+import { dashboardService } from "../../services/admin/dashboardService";
 import useStatusLabel from "../../composables/utils/statusLabel";
 import useFormatDate from "../../composables/utils/formatDate";
 export default {
@@ -179,15 +179,19 @@ export default {
     const toast = useToast();
     const { statusReverseLabel, statusClasses } = useStatusLabel();
     const { formatDate } = useFormatDate();
-    const deviceStore = useDeviceStore();
-    const categoryStore = useDeviceCategoryStore();
 
     const stats = reactive({
       users: 0,
-      categories: computed(() => categoryStore.pagination.total),
-      devices: computed(() => deviceStore.pagination.total),
+      devices_unit: 0,
+      devices: 0,
       pendingReservations: 0,
+      totalBorrows: 0,
+      activeBorrows: 0,
+      completedBorrows: 0,
+      overdueBorrows: 0,
     });
+
+    const statsLoading = ref(false);
 
     const quickActions = [
       {
@@ -225,6 +229,8 @@ export default {
         const { data } = await reservationsService.getReservations({
           per_page: 5,
         });
+        console.log(data);
+
         recentReservations.value = data.data?.data || [];
       } catch (error) {
         console.error("Load reservations error:", error);
@@ -234,27 +240,33 @@ export default {
     };
 
     const fetchStats = async () => {
+      statsLoading.value = true;
       try {
-        const [usersRes, pendingRes] = await Promise.allSettled([
-          usersService.getAllUser({ page: 1 }),
-          reservationsService.getReservations({
-            status: ["pending"],
-            per_page: 1,
-          }),
-          deviceStore.fetchDevices({ page: 1 }),
-          categoryStore.fetchCategories({ page: 1 }),
-        ]);
+        const { data } = await dashboardService.getStatistics();
 
-        const getTotal = (res, path) => {
-          if (res.status !== "fulfilled") return 0;
-          const data = path ? res.value.data[path] : res.value.data;
-          return data?.total ?? data?.data?.length ?? 0;
-        };
+        if (data?.data) {
+          const backendStats = data.data;
+          // console.log(backendStats);
 
-        stats.users = getTotal(usersRes);
-        stats.pendingReservations = getTotal(pendingRes, "data");
+          stats.users = backendStats.users?.total || 0;
+          stats.devices_unit = backendStats.device_utilization.total_units;
+          stats.devices = backendStats.devices?.total_devices || 0;
+          stats.pendingReservations = backendStats.reservations?.pending || 0;
+          stats.totalBorrows = backendStats.borrows?.total || 0;
+          stats.activeBorrows = backendStats.borrows?.active || 0;
+          stats.completedBorrows = backendStats.borrows?.completed || 0;
+          stats.overdueBorrows = backendStats.borrows?.overdue || 0;
+          stats.totalReservations = backendStats.reservations?.total || 0;
+          stats.approvedReservations = backendStats.reservations?.approved || 0;
+          stats.rejectedReservations = backendStats.reservations?.rejected || 0;
+          stats.cancelledReservations =
+            backendStats.reservations?.cancelled || 0;
+        }
       } catch (error) {
+        console.error("Fetch stats error:", error);
         toast.error("Không thể tải thống kê");
+      } finally {
+        statsLoading.value = false;
       }
     };
 
@@ -268,6 +280,7 @@ export default {
       quickActions,
       recentReservations,
       reservationsLoading,
+      statsLoading,
       formatDate,
       statusLabel: statusReverseLabel,
       statusClasses,

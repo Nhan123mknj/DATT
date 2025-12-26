@@ -59,7 +59,6 @@
       </div>
     </div>
 
-    <!-- Table -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
       <TableLoading v-if="isLoading" />
       <div v-else>
@@ -108,32 +107,29 @@
             </span>
           </template>
 
-          <template #assignee="{ item }">
-            <span class="text-sm text-gray-600">
-              {{ item.assignee?.name || "Chưa phân công" }}
-            </span>
-          </template>
-
-          <template #cost="{ item }">
-            <span class="text-sm font-medium text-gray-900">
-              {{ formatCurrency(item.cost) }}
-            </span>
-          </template>
-
           <template #actions="{ item }">
             <div class="flex gap-2">
               <button
-                @click="openEdit(item)"
-                class="px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm"
+                v-if="
+                  item.status === 'pending' || item.status === 'in_progress'
+                "
+                @click="completeMaintenance(item.id)"
+                class="px-3 py-1 rounded-lg border border-green-200 text-green-600 hover:bg-green-50 text-sm font-medium"
               >
-                Sửa
+                Xử lý xong
               </button>
               <button
-                @click="deleteItem(item.id)"
-                class="px-3 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm"
+                v-if="
+                  item.status === 'pending' || item.status === 'in_progress'
+                "
+                @click="openRetireFromMaintenance(item)"
+                class="px-3 py-1 rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50 text-sm font-medium"
               >
-                Xóa
+                Thanh lý
               </button>
+              <span v-else class="px-3 py-1 text-sm text-gray-400">
+                {{ statusLabel(item.status) }}
+              </span>
             </div>
           </template>
         </Table>
@@ -146,7 +142,6 @@
       </div>
     </div>
 
-    <!-- Form Modal -->
     <MaintenanceFormModal
       :show="showModal"
       :mode="modalMode"
@@ -154,20 +149,28 @@
       @close="closeModal"
       @refresh="loadData(pagination.current_page)"
     />
+
+    <RetireModal
+      :show="showRetireModal"
+      :device-unit="selectedMaintenanceForRetire?.device_unit"
+      @close="showRetireModal = false"
+      @retire="handleRetireFromMaintenance"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from "vue";
 import { useToast } from "vue-toastification";
-import maintenanceService from "../../services/maintenanceService";
-import Table from "../../components/common/Table.vue";
-import Button from "../../components/common/Button.vue";
-import TableLoading from "../../components/common/TableLoading.vue";
-import Pagination from "../../components/common/Pagination.vue";
-import SearchBar from "../../components/common/SearchBar.vue";
-import Dropdown from "../../components/common/Dropdown.vue";
-import MaintenanceFormModal from "../../components/maintenance/MaintenanceFormModal.vue";
+import maintenanceService from "../../../services/maintenanceService";
+import Table from "../../../components/common/Table.vue";
+import Button from "../../../components/common/Button.vue";
+import TableLoading from "../../../components/common/TableLoading.vue";
+import Pagination from "../../../components/common/Pagination.vue";
+import SearchBar from "../../../components/common/SearchBar.vue";
+import Dropdown from "../../../components/common/Dropdown.vue";
+import MaintenanceFormModal from "../../../components/maintenance/MaintenanceFormModal.vue";
+import RetireModal from "../../../components/admin/device_unit/RetireModal.vue";
 
 const toast = useToast();
 const isLoading = ref(false);
@@ -197,8 +200,6 @@ const headers = {
   priority: "Mức độ",
   status: "Trạng thái",
   reporter: "Người báo cáo",
-  assignee: "Người xử lý",
-  cost: "Chi phí",
 };
 
 const statusOptions = [
@@ -257,26 +258,61 @@ const openCreate = () => {
   showModal.value = true;
 };
 
-const openEdit = (maintenance) => {
-  selectedMaintenance.value = maintenance;
-  modalMode.value = "edit";
-  showModal.value = true;
-};
-
 const closeModal = () => {
   showModal.value = false;
   selectedMaintenance.value = null;
 };
 
-const deleteItem = async (id) => {
-  if (!confirm("Bạn chắc chắn muốn xóa phiếu bảo trì này?")) return;
+const completeMaintenance = async (id) => {
+  if (
+    !confirm(
+      "Xác nhận hoàn thành bảo trì? Thiết bị sẽ chuyển về trạng thái khả dụng."
+    )
+  )
+    return;
 
   try {
-    await maintenanceService.delete(id);
-    toast.success("Đã xóa phiếu bảo trì");
+    await maintenanceService.complete(id);
+    toast.success("Đã hoàn thành bảo trì. Thiết bị đã sẵn sàng sử dụng.");
     loadData(pagination.current_page);
   } catch (error) {
-    toast.error("Không thể xóa phiếu bảo trì");
+    toast.error(
+      error.response?.data?.message || "Không thể hoàn thành bảo trì"
+    );
+  }
+};
+
+const showRetireModal = ref(false);
+const selectedMaintenanceForRetire = ref(null);
+
+const openRetireFromMaintenance = (maintenance) => {
+  selectedMaintenanceForRetire.value = maintenance;
+  showRetireModal.value = true;
+};
+
+const handleRetireFromMaintenance = async (retirementData) => {
+  if (!selectedMaintenanceForRetire.value?.device_unit_id) {
+    toast.error("Không tìm thấy thiết bị");
+    return;
+  }
+
+  try {
+    const { deviceUnitService } = await import(
+      "../../../services/admin/deviceUnitService"
+    );
+    await deviceUnitService.retire(
+      selectedMaintenanceForRetire.value.device_unit_id,
+      retirementData
+    );
+
+    await maintenanceService.delete(selectedMaintenanceForRetire.value.id);
+
+    toast.success("Đã thanh lý thiết bị");
+    showRetireModal.value = false;
+    selectedMaintenanceForRetire.value = null;
+    loadData(pagination.current_page);
+  } catch (error) {
+    toast.error(error.response?.data?.error || "Không thể thanh lý thiết bị");
   }
 };
 
@@ -293,7 +329,6 @@ const resetFilters = () => {
   loadData();
 };
 
-// Helper functions
 const typeLabel = (type) => {
   const option = typeOptions.find((o) => o.value === type);
   return option ? option.label : type;

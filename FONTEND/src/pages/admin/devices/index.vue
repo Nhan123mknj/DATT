@@ -20,16 +20,27 @@
             <font-awesome-icon icon="trash" class="mr-2" />
           </template>
         </Button>
-        <Button
-          v-if="selectedDevices.length > 0"
-          label="Xuất Excel"
-          color="success"
-          @click="exportExcel"
-        >
+
+        <Button label="Xuất Excel" color="success" @click="exportAllDevices">
           <template #icon>
             <font-awesome-icon icon="file-excel" class="mr-2" />
           </template>
         </Button>
+
+        <Button label="Nhập Excel" color="primary" @click="triggerFileInput">
+          <template #icon>
+            <font-awesome-icon icon="file-upload" class="mr-2" />
+          </template>
+        </Button>
+
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          class="hidden"
+          @change="handleFileImport"
+        />
+
         <Button label="Thêm thiết bị" @click="openCreate">
           <template #icon>
             <font-awesome-icon icon="plus" class="mr-2" />
@@ -284,6 +295,70 @@ export default {
       stats: "Thống kê (Tổng/Mượn/Đặt/Bảo trì)",
     };
 
+    // Export/Import Excel
+    const fileInput = ref(null);
+
+    const exportAllDevices = async () => {
+      try {
+        toast.info("Đang xuất file Excel...");
+        const response = await devicesService.exportExcel();
+
+        // Create download link
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `devices_${new Date().getTime()}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Xuất Excel thành công!");
+      } catch (error) {
+        console.error("Export error:", error);
+        toast.error("Không thể xuất file Excel");
+      }
+    };
+
+    const triggerFileInput = () => {
+      fileInput.value.click();
+    };
+
+    const handleFileImport = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      try {
+        toast.info("Đang nhập dữ liệu...");
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        await devicesService.importExcel(formData);
+
+        toast.success("Nhập Excel thành công!");
+        handleLoadDevices(); // Reload data
+
+        // Reset file input
+        event.target.value = "";
+      } catch (error) {
+        console.error("Import error:", error);
+
+        if (error.response?.data?.errors) {
+          // Validation errors
+          const errors = error.response.data.errors;
+          toast.error(`Import thất bại: ${errors.length} lỗi`);
+        } else {
+          toast.error(
+            error.response?.data?.message || "Không thể nhập file Excel"
+          );
+        }
+
+        // Reset file input
+        event.target.value = "";
+      }
+    };
+
     onMounted(() => {
       loadCategories();
       handleLoadDevices();
@@ -315,7 +390,10 @@ export default {
       handleSearch,
       headers,
       statusOptions,
-      exportExcel: () => toast.info("Tính năng đang phát triển"),
+      fileInput,
+      exportAllDevices,
+      triggerFileInput,
+      handleFileImport,
     };
   },
 };

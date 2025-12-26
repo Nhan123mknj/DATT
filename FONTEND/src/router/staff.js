@@ -26,6 +26,18 @@ const staff = [
         meta: { title: 'Phiếu mượn' },
       },
       {
+        path: 'return-slips',
+        name: 'staff.returnSlips',
+        component: () => import('../pages/staff/ReturnSlips.vue'),
+        meta: { title: 'Phiếu trả' },
+      },
+      {
+        path: 'return-slips/:id',
+        name: 'staff.returnSlipDetail',
+        component: () => import('../pages/staff/ReturnSlipDetail.vue'),
+        meta: { title: 'Chi tiết phiếu trả' },
+      },
+      {
         path: 'maintenance',
         name: 'staff.maintenance',
         component: () => import('../pages/staff/maintenance/index.vue'),

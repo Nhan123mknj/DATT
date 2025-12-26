@@ -64,9 +64,9 @@ class StaffDashboardService
         $result = DB::selectOne("
             SELECT 
                 COUNT(*) as total_borrows,
-                COUNT(CASE WHEN status = 'borrowed' THEN 1 END) as active_borrows,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as active_borrows,
                 COUNT(CASE WHEN status = 'returned' THEN 1 END) as returned_borrows,
-                COUNT(CASE WHEN status = 'borrowed' AND expected_return_date < NOW() THEN 1 END) as overdue_borrows
+                COUNT(CASE WHEN status = 'completed' AND expected_return_date < NOW() THEN 1 END) as overdue_borrows
             FROM borrows
         ");
 
@@ -87,9 +87,14 @@ class StaffDashboardService
     {
         $result = DB::selectOne("
             SELECT 
-                COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as borrows_created_today,
-                COUNT(CASE WHEN DATE(actual_return_date) = CURDATE() THEN 1 END) as returns_processed_today
-            FROM borrows
+                COUNT(CASE WHEN DATE(b.created_at) = CURDATE() THEN 1 END) as borrows_created_today
+            FROM borrows b
+        ");
+
+        $returns = DB::selectOne("
+            SELECT COUNT(*) as returns_processed_today
+            FROM return_slips
+            WHERE DATE(return_date) = CURDATE()
         ");
 
         $reservations = DB::selectOne("
@@ -100,7 +105,7 @@ class StaffDashboardService
 
         return [
             'borrows_issued' => $result->borrows_created_today ?? 0,
-            'returns_processed' => $result->returns_processed_today ?? 0,
+            'returns_processed' => $returns->returns_processed_today ?? 0,
             'reservations_created' => $reservations->reservations_created_today ?? 0,
         ];
     }
@@ -114,12 +119,13 @@ class StaffDashboardService
     {
         $trends = DB::select("
             SELECT 
-                DATE(created_at) as date,
-                COUNT(CASE WHEN status IN ('borrowed', 'returned') THEN 1 END) as borrows,
-                COUNT(CASE WHEN status = 'returned' AND DATE(actual_return_date) = DATE(created_at) THEN 1 END) as returns
-            FROM borrows
-            WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-            GROUP BY DATE(created_at)
+                DATE(b.created_at) as date,
+                COUNT(CASE WHEN b.status IN ('completed', 'returned') THEN 1 END) as borrows,
+                COUNT(DISTINCT rs.id) as returns
+            FROM borrows b
+            LEFT JOIN return_slips rs ON b.id = rs.borrow_id AND DATE(rs.return_date) = DATE(b.created_at)
+            WHERE b.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            GROUP BY DATE(b.created_at)
             ORDER BY date DESC
         ");
 

@@ -22,4 +22,18 @@ export const deviceService = {
   remove(id) {
     return apiClient.delete(`${BASE_URL}/${id}`)
   },
+
+  exportExcel() {
+    return apiClient.get(`${BASE_URL}/export/excel`, {
+      responseType: 'blob' 
+    })
+  },
+
+  importExcel(formData) {
+    return apiClient.post(`${BASE_URL}/import/excel`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
 }

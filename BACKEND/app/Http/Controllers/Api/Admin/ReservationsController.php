@@ -11,8 +11,12 @@ class ReservationsController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = DeviceReservation::with(['user', 'details.deviceUnit.device'])
-                ->orderBy('created_at', 'desc');
+            $query = DeviceReservation::with([
+                'user',
+                'details.deviceUnit' => function ($q) {
+                    $q->withTrashed()->with('device');
+                }
+            ])->orderBy('created_at', 'desc');
 
             if ($request->has('status')) {
                 $query->whereIn('status', (array) $request->status);

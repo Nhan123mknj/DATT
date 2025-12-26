@@ -48,8 +48,8 @@ class DeviceUnitsExport implements FromCollection, WithHeadings, WithMapping, Wi
             'available' => 'Khả dụng',
             'borrowed' => 'Đang mượn',
             'reserved' => 'Đã đặt',
-            'under_maintenance' => 'Bảo trì',
-            'broken' => 'Hỏng',
+            'maintenance' => 'Bảo trì',
+            'retired' => 'Đã thanh lý',
         ];
 
         return [
@@ -59,7 +59,7 @@ class DeviceUnitsExport implements FromCollection, WithHeadings, WithMapping, Wi
             $unit->serial_number,
             $statusLabels[$unit->status] ?? $unit->status,
             $unit->purchase_date ? date('d/m/Y', strtotime($unit->purchase_date)) : '',
-            $unit->warranty_expiry ? date('d/m/Y', strtotime($unit->warranty_expiry)) : '',
+            $unit->warranty_end ? date('d/m/Y', strtotime($unit->warranty_end)) : '',
             $unit->notes ?? '',
             $unit->created_at->format('d/m/Y H:i'),
         ];

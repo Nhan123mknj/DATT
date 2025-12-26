@@ -6,7 +6,6 @@
     @close="$emit('close')"
     @submit="handleSubmit"
   >
-    <!-- Hiển thị lỗi chung -->
     <ul
       v-if="Object.keys(errors).length"
       class="mb-4 list-disc list-inside text-red-600 bg-red-100 p-3 rounded-md"
@@ -16,9 +15,7 @@
       </li>
     </ul>
 
-    <!-- Form Fields -->
     <div class="space-y-6">
-      <!-- Tên tài khoản -->
       <div>
         <label for="name" class="block text-sm font-medium text-gray-900">
           Tên tài khoản <span class="text-red-500">*</span>
@@ -34,7 +31,6 @@
         </p>
       </div>
 
-      <!-- Email -->
       <div>
         <label for="email" class="block text-sm font-medium text-gray-900">
           Email <span class="text-red-500">*</span>
@@ -50,7 +46,24 @@
         </p>
       </div>
 
-      <!-- Role -->
+      <div>
+        <label
+          for="credit_score"
+          class="block text-sm font-medium text-gray-900"
+        >
+          Credit Score <span class="text-red-500">*</span>
+        </label>
+        <input
+          id="credit_score"
+          v-model="form.credit_score"
+          type="number"
+          class="mt-2 block w-full rounded-md border px-3 py-2 text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+        />
+        <p v-if="errors.credit_score" class="text-sm text-red-600 mt-1">
+          {{ errors.credit_score }}
+        </p>
+      </div>
+
       <div>
         <label for="role" class="block text-sm font-medium text-gray-900">
           Role <span class="text-red-500">*</span>
@@ -71,7 +84,6 @@
         </p>
       </div>
 
-      <!-- Trạng thái -->
       <div>
         <label class="block text-sm font-medium text-gray-900">
           Trạng thái
@@ -122,8 +134,8 @@
 </template>
 
 <script>
-import ModalForm from "../ModalForm.vue";
-import { usersService } from "../../services/admin/usersService";
+import ModalForm from "../../ModalForm.vue";
+import { usersService } from "../../../services/admin/usersService";
 import { useToast } from "vue-toastification";
 
 export default {
@@ -143,6 +155,7 @@ export default {
         name: "",
         email: "",
         role: "",
+        credit_score: "",
         is_active: 1,
       },
       errors: {},
@@ -154,14 +167,17 @@ export default {
       immediate: true,
       deep: true,
       handler(newUserData) {
+        console.log("userData received:", newUserData); // DEBUG
         if (newUserData) {
           Object.assign(this.form, {
             id: newUserData.id,
             name: newUserData.name || "",
             email: newUserData.email || "",
             role: newUserData.role || "",
+            credit_score: newUserData.credit_score || 0,
             is_active: newUserData.is_active ?? 1,
           });
+          console.log("form after assign:", this.form); // DEBUG
         }
       },
     },

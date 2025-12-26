@@ -61,7 +61,7 @@ class BorrowPolicy
             return false;
         }
         $activeCount = Borrows::where('borrower_id', $user->id)
-            ->whereIn('status', ['pending', 'approved', 'borrowed'])
+            ->whereIn('status', ['pending', 'approved', 'completed'])
             ->count();
 
         if ($activeCount >= 3) {
@@ -113,6 +113,20 @@ class BorrowPolicy
     public function issue(User $user, Borrows $borrows): bool
     {
         return in_array($user->role, ['admin', 'staff']) && $this->isActive($user);
+    }
+
+    public function cancel(User $user, Borrows $borrows): bool
+    {
+
+        if (in_array($user->role, ['admin', 'staff']) && $this->isActive($user)) {
+            return true;
+        }
+
+        if (in_array($user->role, ['student', 'teacher']) && $this->isActive($user)) {
+            return $borrows->borrower_id === $user->id && $borrows->status === 'pending';
+        }
+
+        return false;
     }
 
     public function return(User $user, Borrows $borrows): bool

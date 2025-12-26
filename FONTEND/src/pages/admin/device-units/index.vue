@@ -9,11 +9,42 @@
           Quản lý từng thiết bị cụ thể, số serial và trạng thái sử dụng.
         </p>
       </div>
-      <Button @click="openCreate" label="Thêm đơn vị">
-        <template #icon>
-          <font-awesome-icon icon="plus" class="mr-2" />
-        </template>
-      </Button>
+      <div class="flex gap-2">
+        <Button label=" Xuất Excel" color="success" @click="exportUnits">
+          <template #icon>
+            <font-awesome-icon icon="file-excel" class="mr-2" />
+          </template>
+        </Button>
+        <Button
+          label="Xuất danh sách người mượn"
+          color="success"
+          @click="exportBorrowers"
+        >
+          <template #icon>
+            <font-awesome-icon icon="file-excel" class="mr-2" />
+          </template>
+        </Button>
+
+        <Button label="Nhập Excel" color="primary" @click="triggerFileInput">
+          <template #icon>
+            <font-awesome-icon icon="file-upload" class="mr-2" />
+          </template>
+        </Button>
+
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          class="hidden"
+          @change="handleFileImport"
+        />
+
+        <Button @click="openCreate" label="Thêm đơn vị">
+          <template #icon>
+            <font-awesome-icon icon="plus" class="mr-2" />
+          </template>
+        </Button>
+      </div>
     </div>
 
     <div
@@ -53,7 +84,12 @@
               {{ statusLabel(item.status) }}
             </span>
           </template>
-
+          <template #purchase_date="{ item }">
+            {{ formatDates(item.purchase_date) }}
+          </template>
+          <template #warranty_end="{ item }">
+            {{ formatDates(item.warranty_end) }}
+          </template>
           <template #actions="{ item }">
             <div class="flex gap-2">
               <button
@@ -63,129 +99,44 @@
                 Sửa
               </button>
               <button
-                class="px-3 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm"
-                @click="deleteItem(item.id)"
+                class="px-3 py-1 rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50 text-sm"
+                @click="openRetireModal(item)"
               >
-                Xóa
+                Thanh lý
               </button>
             </div>
           </template>
         </Table>
-        <Pagination
-          v-if="pagination.total && pagination.last_page > 1"
-          :links="pagination.links"
-          @page-changed="loadData"
-        />
+        <Pagination :links="pagination.links" @page-changed="loadData" />
       </div>
     </div>
 
-    <Modal :show="showModal" :title="modalTitle" @close="closeModal">
-      <form class="space-y-4" @submit.prevent="saveUnit">
-        <div class="grid gap-4 md:grid-cols-2">
-          <div>
-            <label class="text-sm font-medium text-gray-700">Thiết bị</label>
-            <select
-              v-model="form.device_id"
-              class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            >
-              <option value="">-- Chọn thiết bị --</option>
-              <option
-                v-for="device in devices"
-                :key="device.id"
-                :value="device.id"
-              >
-                {{ device.name }}
-              </option>
-            </select>
-            <p v-if="errors.device_id" class="text-xs text-red-500 mt-1">
-              {{ errors.device_id?.[0] || errors.device_id }}
-            </p>
-          </div>
-          <div>
-            <label class="text-sm font-medium text-gray-700">Serial</label>
-            <input
-              v-model="form.serial_number"
-              type="text"
-              class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            />
-            <p v-if="errors.serial_number" class="text-xs text-red-500 mt-1">
-              {{ errors.serial_number?.[0] || errors.serial_number }}
-            </p>
-          </div>
-        </div>
-        <div class="grid gap-4 md:grid-cols-2">
-          <div>
-            <label class="text-sm font-medium text-gray-700">Trạng thái</label>
-            <select
-              v-model="form.status"
-              class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            >
-              <option
-                v-for="status in statusOptions"
-                :key="status.value"
-                :value="status.value"
-              >
-                {{ status.label }}
-              </option>
-            </select>
-            <p v-if="errors.status" class="text-xs text-red-500 mt-1">
-              {{ errors.status?.[0] || errors.status }}
-            </p>
-          </div>
-        </div>
-        <div class="grid gap-4 md:grid-cols-2">
-          <div>
-            <label class="text-sm font-medium text-gray-700">Ngày mua</label>
-            <input
-              v-model="form.purchase_date"
-              type="date"
-              class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            />
-            <p v-if="errors.purchase_date" class="text-xs text-red-500 mt-1">
-              {{ errors.purchase_date?.[0] || errors.purchase_date }}
-            </p>
-          </div>
-          <div>
-            <label class="text-sm font-medium text-gray-700"
-              >Hạn bảo hành</label
-            >
-            <input
-              v-model="form.warranty_end"
-              type="date"
-              class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            />
-          </div>
-        </div>
-        <div>
-          <label class="text-sm font-medium text-gray-700">Ghi chú</label>
-          <textarea
-            v-model="form.notes"
-            rows="3"
-            class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200"
-            placeholder="Tình trạng khi nhập kho..."
-          ></textarea>
-        </div>
-        <button type="submit" class="hidden" aria-hidden="true"></button>
-      </form>
-      <template #footer>
-        <div class="flex gap-3">
-          <button
-            type="button"
-            class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600"
-            @click="closeModal"
-          >
-            Hủy
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-lg bg-indigo-600 text-white"
-            @click="saveUnit"
-          >
-            {{ modalMode === "create" ? "Thêm mới" : "Cập nhật" }}
-          </button>
-        </div>
-      </template>
-    </Modal>
+    <CreateDeviceUnitForm
+      :show="showModal && modalMode === 'create'"
+      :form="form"
+      :errors="errors"
+      :devices="devices"
+      :status-options="statusOptions"
+      @close="closeModal"
+      @submit="saveUnit"
+    />
+
+    <UpdateDeviceUnitForm
+      :show="showModal && modalMode === 'edit'"
+      :form="form"
+      :errors="errors"
+      :devices="devices"
+      :status-options="statusOptions"
+      @close="closeModal"
+      @submit="saveUnit"
+    />
+
+    <RetireModal
+      :show="showRetireModal"
+      :device-unit="selectedUnit"
+      @close="showRetireModal = false"
+      @retire="handleRetire"
+    />
   </div>
 </template>
 
@@ -195,12 +146,18 @@ import Table from "../../../components/common/Table.vue";
 import Button from "../../../components/common/Button.vue";
 import TableLoading from "../../../components/common/TableLoading.vue";
 import Pagination from "../../../components/common/Pagination.vue";
-import Modal from "../../../components/Modal.vue";
 import SearchBar from "../../../components/common/SearchBar.vue";
 import Dropdown from "../../../components/common/Dropdown.vue";
+import CreateDeviceUnitForm from "../../../components/admin/device_unit/CreateDeviceUnitForm.vue";
+import UpdateDeviceUnitForm from "../../../components/admin/device_unit/UpdateDeviceUnitForm.vue";
+import RetireModal from "../../../components/admin/device_unit/RetireModal.vue";
 import { devicesService } from "../../../services/devices/devicesService";
+import { deviceUnitService } from "../../../services/admin/deviceUnitService";
 import { useDeviceUnits } from "../../../composables/fetchData/admin/useDeviceUnits";
 import { useForm } from "../../../composables/useForm";
+import { useToast } from "vue-toastification";
+import formatDates from "../../../composables/utils/formatDates";
+import apiClient from "../../../services/api/apiClient";
 export default {
   name: "DeviceUnits",
   components: {
@@ -208,11 +165,14 @@ export default {
     Button,
     TableLoading,
     Pagination,
-    Modal,
     SearchBar,
     Dropdown,
+    CreateDeviceUnitForm,
+    UpdateDeviceUnitForm,
+    RetireModal,
   },
   setup() {
+    const toast = useToast();
     const devices = ref([]);
 
     const {
@@ -220,7 +180,8 @@ export default {
       isLoading,
       pagination,
       loadDeviceUnits,
-      deleteDeviceUnit,
+      retireDeviceUnit,
+      bulkRetireDeviceUnits,
       filters,
       addUnit,
       updateUnit,
@@ -271,7 +232,7 @@ export default {
 
     const statusOptions = [
       { value: "available", label: "Sẵn sàng" },
-      { value: "reserved", label: "Đặt trước" },
+      { value: "reserved", label: "Được mượn" },
       { value: "under_maintenance", label: "Bảo trì" },
       { value: "retired", label: "Ngưng sử dụng" },
     ];
@@ -328,10 +289,130 @@ export default {
       }
     };
 
+    const fileInput = ref(null);
+
+    const exportUnits = async () => {
+      try {
+        toast.info("Đang xuất file Excel...");
+        const response = await deviceUnitService.exportExcel();
+
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute(
+          "download",
+          `device_units_${new Date().getTime()}.xlsx`
+        );
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Xuất Excel thành công!");
+      } catch (error) {
+        console.error("Export error:", error);
+        toast.error("Không thể xuất file Excel");
+      }
+    };
+
+    const triggerFileInput = () => {
+      fileInput.value.click();
+    };
+
+    const handleFileImport = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      try {
+        toast.info("Đang nhập dữ liệu...");
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        await deviceUnitService.importExcel(formData);
+
+        toast.success("Nhập Excel thành công!");
+        handleLoadUnits();
+
+        event.target.value = "";
+      } catch (error) {
+        console.error("Import error:", error);
+
+        if (error.response?.data?.errors) {
+          const errors = error.response.data.errors;
+          toast.error(`Import thất bại: ${errors.length} lỗi`);
+        } else {
+          toast.error(
+            error.response?.data?.message || "Không thể nhập file Excel"
+          );
+        }
+
+        event.target.value = "";
+      }
+    };
+
     onMounted(() => {
       loadDevices();
       handleLoadUnits();
     });
+
+    const showRetireModal = ref(false);
+    const selectedUnit = ref(null);
+
+    const openRetireModal = (unit) => {
+      selectedUnit.value = unit;
+      showRetireModal.value = true;
+    };
+
+    const exportBorrowers = async () => {
+      try {
+        const response = await apiClient.get(
+          "/admin/device-units/export-borrowers",
+          {
+            responseType: "blob",
+          }
+        );
+
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute(
+          "download",
+          `device_unit_borrowers_${new Date().getTime()}.xlsx`
+        );
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Xuất danh sách người mượn thành công!");
+      } catch (error) {
+        console.error("Export borrowers error:", error);
+        toast.error("Không thể xuất danh sách người mượn");
+      }
+    };
+    const handleRetire = async (retirementData) => {
+      if (selectedUnit.value) {
+        try {
+          const response = await deviceUnitService.retire(
+            selectedUnit.value.id,
+            retirementData
+          );
+
+          if (response.data) {
+            toast.success("Thanh lý thiết bị thành công!");
+            showRetireModal.value = false;
+            selectedUnit.value = null;
+            handleLoadUnits(pagination.current_page);
+          }
+        } catch (error) {
+          console.error("Retire error:", error);
+          toast.error(
+            error.response?.data?.error || "Không thể thanh lý thiết bị"
+          );
+        }
+      }
+    };
 
     return {
       filters,
@@ -362,6 +443,16 @@ export default {
       statusClass,
       devices,
       statusOptions,
+      fileInput,
+      exportUnits,
+      triggerFileInput,
+      handleFileImport,
+      showRetireModal,
+      selectedUnit,
+      openRetireModal,
+      handleRetire,
+      formatDates,
+      exportBorrowers,
     };
   },
 };

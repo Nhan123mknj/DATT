@@ -5,7 +5,6 @@ import { menuService } from "../../../services/admin/menuService";
 export function useMenu() {
   const toast = useToast();
 
-  // State
   const menus = ref([]);
   const currentMenu = ref(null);
   const currentMenuItems = ref([]);
@@ -41,12 +40,9 @@ export function useMenu() {
     description: "",
   });
 
-  // Computed
   const rootItems = computed(() => {
     return currentMenuItems.value.filter((item) => !item.parent_id);
   });
-
-  // Methods
   const loadMenus = async () => {
     loading.value = true;
     try {

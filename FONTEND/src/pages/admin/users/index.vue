@@ -87,7 +87,13 @@
           >
             <font-awesome-icon icon="fa-solid fa-pen" />
           </button>
-
+          <button
+            @click="resetPassword(item)"
+            class="px-2 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+            title="Reset mật khẩu"
+          >
+            <font-awesome-icon icon="fa-solid fa-key" />
+          </button>
           <button
             @click="handleDelete(item)"
             class="px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition"
@@ -126,8 +132,8 @@ import { useUserStore } from "../../../stores/userStore";
 import Table from "../../../components/common/Table.vue";
 import Button from "../../../components/common/Button.vue";
 import TableLoading from "../../../components/common/TableLoading.vue";
-import AddUserForm from "../../../components/user/AddUserForm.vue";
-import UpdateUserForm from "../../../components/user/UpdateUserForm.vue";
+import AddUserForm from "../../../components/admin/user/AddUserForm.vue";
+import UpdateUserForm from "../../../components/admin/user/UpdateUserForm.vue";
 import Pagination from "../../../components/common/Pagination.vue";
 import Dropdown from "../../../components/common/Dropdown.vue";
 import SearchBar from "../../../components/common/SearchBar.vue";
@@ -144,6 +150,7 @@ const headers = {
   name: "Tên",
   email: "Email",
   role: "Vai trò",
+  credit_score: "Điểm tín dụng",
   is_active: "Trạng thái",
 };
 
@@ -170,6 +177,16 @@ const viewDetail = async (user) => {
 const handleDelete = async (user) => {
   const deleted = await userStore.deleteUser(user.id);
   if (deleted) {
+    userStore.loadUsers(userStore.pagination.current_page);
+  }
+};
+
+const resetPassword = async (user) => {
+  let confirm = window.confirm("Bạn có chắc chắn muốn reset mật khẩu không?");
+  if (!confirm) return;
+  const reset = await usersService.resetPassword(user.id);
+  if (reset) {
+    toast.success("Reset mật khẩu thành công");
     userStore.loadUsers(userStore.pagination.current_page);
   }
 };

@@ -16,18 +16,13 @@ class Borrows extends Model
         'borrower_id',
         'borrowed_date',
         'expected_return_date',
-        'actual_return_date',
         'status',
         'notes',
         'commitment_file',
-        'staff_signature',
-        'borrower_signature',
-        'return_notes',
         'returned_by_staff_id',
-        'return_slip_pdf_path',
-        'return_slip_generated_at',
         'created_by_user_id',
         'issued_by_user_id',
+        'issued_at',
     ];
 
     public function borrower()
@@ -49,9 +44,48 @@ class Borrows extends Model
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
-
     public function issuedBy()
     {
         return $this->belongsTo(User::class, 'issued_by_user_id');
+    }
+
+    /**
+     * Relationship: Borrow has many ReturnSlips
+     */
+    public function returnSlips()
+    {
+        return $this->hasMany(ReturnSlip::class, 'borrow_id');
+    }
+
+    /**
+     * Relationship: Get the latest return slip (singular)
+     * Useful for checking if a borrow has been returned
+     */
+    public function returnSlip()
+    {
+        return $this->hasOne(ReturnSlip::class, 'borrow_id')->latestOfMany();
+    }
+
+    /**
+     * Get latest return slip
+     */
+    public function latestReturnSlip()
+    {
+        return $this->hasOne(ReturnSlip::class, 'borrow_id')->latest();
+    }
+
+    /**
+     * Check if all borrowed devices have been returned
+     */
+    public function isFullyReturned(): bool
+    {
+        $totalBorrowed = $this->details()->count();
+
+        $totalReturned = ReturnSlipDetail::whereIn(
+            'return_slip_id',
+            $this->returnSlips()->pluck('id')
+        )->distinct('device_unit_id')->count();
+
+        return $totalBorrowed === $totalReturned;
     }
 }

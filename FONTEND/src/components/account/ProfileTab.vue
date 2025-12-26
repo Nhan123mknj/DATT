@@ -23,7 +23,6 @@
             </p>
           </div>
 
-          <!-- Email -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
               Email <span class="text-red-500">*</span>
@@ -39,7 +38,6 @@
             </p>
           </div>
 
-          <!-- Student Code or Teacher Code -->
           <div
             v-if="
               currentUser.student?.student_code ||
@@ -61,7 +59,6 @@
             <p class="text-xs text-gray-500 mt-1">Liên hệ admin để thay đổi</p>
           </div>
 
-          <!-- Phone -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
               Số điện thoại
@@ -77,7 +74,6 @@
             </p>
           </div>
 
-          <!-- Department -->
           <div v-if="currentUser.department">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               Phòng ban
@@ -92,7 +88,6 @@
           </div>
         </div>
 
-        <!-- Actions -->
         <div class="flex gap-3 mt-8 pt-6 border-t border-gray-200">
           <button
             type="submit"

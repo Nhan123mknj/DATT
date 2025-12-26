@@ -17,7 +17,6 @@ class DevicesImport implements ToModel, WithHeadingRow, WithValidation
      */
     public function model(array $row)
     {
-        // Tìm category by name
         $category = CategoriesDevice::where('name', $row['danh_muc'])->first();
 
         if (!$category) {

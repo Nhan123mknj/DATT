@@ -26,7 +26,9 @@ class ReservationController extends Controller
             'user:id,name,email,role',
             'user.student:user_id,student_code,grade_level,class_name',
             'user.teacher:user_id,teacher_code,department,position',
-            'details.deviceUnit.device',
+            'details.deviceUnit' => function ($query) {
+                $query->withTrashed()->with('device');
+            },
             'approver:id,name'
         ]);
 
@@ -88,7 +90,9 @@ class ReservationController extends Controller
                 'user:id,name,email,role',
                 'user.student:user_id,student_code,grade_level,class_name',
                 'user.teacher:user_id,teacher_code,department,position',
-                'details.deviceUnit.device',
+                'details.deviceUnit' => function ($query) {
+                    $query->withTrashed()->with('device');
+                },
                 'approvedBy'
             ])->findOrFail($id);
 
@@ -239,6 +243,22 @@ class ReservationController extends Controller
             return response()->json([
                 'message' => 'Tạo phiếu mượn thất bại',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function export(Request $request)
+    {
+        try {
+            $filters = $request->only(['status']);
+
+            return \Maatwebsite\Excel\Facades\Excel::download(
+                new \App\Exports\ReservationsExport($filters),
+                'phieu-dat-truoc-' . now()->format('Y-m-d') . '.xlsx'
+            );
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Không thể xuất file Excel: ' . $e->getMessage()
             ], 500);
         }
     }

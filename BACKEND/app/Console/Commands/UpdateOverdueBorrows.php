@@ -20,7 +20,7 @@ class UpdateOverdueBorrows extends Command
      *
      * @var string
      */
-    protected $description = 'Update status of overdue borrows to overdue';
+    protected $description = 'Cập nhật phiếu mượn quá hạn';
 
     /**
      * Execute the console command.
@@ -29,9 +29,11 @@ class UpdateOverdueBorrows extends Command
     {
         $today = now()->toDateString();
 
+
         $overdueBorrows = Borrows::with('borrower', 'details.deviceUnit.device')
-            ->where('status', 'borrowed')
+            ->where('status', 'completed')
             ->where('expected_return_date', '<', $today)
+            ->whereDoesntHave('returnSlip') 
             ->get();
 
         $count = 0;
@@ -41,16 +43,16 @@ class UpdateOverdueBorrows extends Command
 
             if ($borrow->borrower) {
                 $borrow->borrower->notify(new \App\Notifications\DeviceReturnReminder($borrow));
-                $this->info("Updated borrow #{$borrow->id} to overdue and sent notification to {$borrow->borrower->email}");
+                $this->info("Cập nhật phiếu mượn #{$borrow->id} thành quá hạn và gửi thông báo đến {$borrow->borrower->email}");
             }
             $count++;
         }
 
         if ($count > 0) {
-            $this->info("Processed {$count} overdue borrows.");
-            \Log::info("Processed {$count} overdue borrows.");
+            $this->info("Hoàn thành! Cập nhật {$count} phiếu mượn quá hạn.");
+            \Log::info("Hoàn thành! Cập nhật {$count} phiếu mượn quá hạn.");
         } else {
-            $this->info("No overdue borrows found.");
+            $this->info("Không tìm thấy phiếu mượn quá hạn.");
         }
     }
 }

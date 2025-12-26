@@ -31,7 +31,6 @@ class ReservationService extends BaseService
             $user = auth('api')->user();
             $userId = $user->id;
 
-            // Check credit score
             if ($user->credit_score < 30) {
                 throw ValidationException::withMessages([
                     'credit_score' => 'Điểm tín nhiệm của bạn quá thấp (' . $user->credit_score . '/100). Vui lòng liên hệ quản trị viên để biết thêm chi tiết.'
@@ -109,6 +108,20 @@ class ReservationService extends BaseService
             }
             DB::afterCommit(function () use ($reservation) {
                 event(new ReservationRequestCreate($reservation));
+
+                activity('reservation')
+                    ->performedOn($reservation)
+                    ->causedBy(auth('api')->user())
+                    ->withProperties([
+                        'device_count' => $reservation->details->count(),
+                        'devices' => $reservation->details->map(fn($d) => [
+                            'name' => $d->deviceUnit->device->name ?? 'N/A',
+                            'serial' => $d->deviceUnit->serial_number ?? 'N/A',
+                        ])->toArray(),
+                        'reserved_from' => $reservation->reserved_from->format('d/m/Y'),
+                        'reserved_until' => $reservation->reserved_until->format('d/m/Y'),
+                    ])
+                    ->log('Tạo phiếu đặt trước');
             });
 
             return $reservation->load('details.deviceUnit.device');
@@ -145,6 +158,18 @@ class ReservationService extends BaseService
             }
 
             broadcast(new ReservationRequestApprove($reservation));
+
+            activity('reservation')
+                ->performedOn($reservation)
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'borrower_name' => $reservation->user->name ?? 'N/A',
+                    'borrower_email' => $reservation->user->email ?? 'N/A',
+                    'device_count' => $reservation->details->count(),
+                    'reserved_from' => $reservation->reserved_from->format('d/m/Y'),
+                    'reserved_until' => $reservation->reserved_until->format('d/m/Y'),
+                ])
+                ->log('Duyệt phiếu đặt trước');
         });
 
         return $reservation->load('details.deviceUnit.device');
@@ -224,6 +249,15 @@ class ReservationService extends BaseService
                 'cancelled_by' => auth()->id(),
                 'cancelled_at' => now()
             ]);
+
+            activity('reservation')
+                ->performedOn($reservation)
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'borrower_name' => $reservation->user->name ?? 'N/A',
+                    'device_count' => $reservation->details->count(),
+                ])
+                ->log('Hủy phiếu đặt trước');
         });
         broadcast(new ReservationRequestCancel($reservation));
 
@@ -246,7 +280,6 @@ class ReservationService extends BaseService
             $devices = collect($data['devices']);
             $userId = $reservation->user_id;
 
-            // 1. Release old units
             foreach ($reservation->details as $detail) {
                 $detail->deviceUnit->update(['status' => 'available']);
                 $detail->delete();

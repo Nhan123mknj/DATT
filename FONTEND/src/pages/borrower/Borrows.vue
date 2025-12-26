@@ -98,7 +98,7 @@
             <template #actions="{ item }">
               <button
                 class="px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-sm font-medium transition-colors"
-                @click="openDetail(item)"
+                @click="handleOpenDetail(item)"
               >
                 Chi tiết
               </button>
@@ -158,7 +158,6 @@ export default {
     const { statusReverseLabel, statusClasses } = useStatusLabel();
     const { formatDate } = useFormatDate();
 
-    // Use Store instead of Composable
     const borrowStore = useBorrowStore();
     const { borrows, pagination, isLoading } = storeToRefs(borrowStore);
     const { fetchBorrows, fetchBorrowById } = borrowStore;
@@ -177,7 +176,7 @@ export default {
     const statusMap = {
       pending: "Chờ duyệt",
       approved: "Đã duyệt",
-      borrowed: "Đang mượn",
+      completed: "Đang mượn",
       overdue: "Quá hạn",
       returned: "Đã trả",
     };
@@ -186,8 +185,22 @@ export default {
     const selectedBorrow = ref(null);
 
     const openDetail = (borrow) => {
+      console.log(borrow);
+
       selectedBorrow.value = borrow;
       showDetailModal.value = true;
+    };
+
+    const handleOpenDetail = async (item) => {
+      try {
+        const borrow = await fetchBorrowById(item.id);
+        if (borrow) {
+          openDetail(borrow);
+        }
+      } catch (error) {
+        toast.error("Không thể tải chi tiết phiếu mượn");
+        console.error(error);
+      }
     };
 
     const closeDetail = () => {
@@ -199,7 +212,6 @@ export default {
       fetchBorrows(page, filters);
     };
 
-    // Alias for template usage
     const loadBorrows = handleLoadBorrows;
 
     const resetFilters = () => {
@@ -211,12 +223,9 @@ export default {
     const toast = useToast();
 
     onMounted(() => {
-      // Only fetch if empty or if you want fresh data on mount
-      // But usually we want fresh data on mount for lists
       handleLoadBorrows();
     });
 
-    // Watch for ID in URL to open detail modal
     watch(
       [() => route.query.id, () => borrows.value],
       async ([id, borrowsList]) => {
@@ -256,6 +265,7 @@ export default {
       showDetailModal,
       selectedBorrow,
       openDetail,
+      handleOpenDetail,
       closeDetail,
       resetFilters,
       statusReverseLabel,

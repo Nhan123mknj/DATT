@@ -15,9 +15,10 @@ Schedule::command('app:process-due-reservations')
 
 
 Schedule::command('reservations:cancel-pending', ['--hours' => 24])
-    ->hourly()
+    ->everyMinute()
     ->timezone('Asia/Ho_Chi_Minh')
     ->name('Auto-cancel pending reservations')
+    ->withoutOverlapping()
     ->onSuccess(function () {
         \Log::info('✅ Auto-cancel command completed');
     })

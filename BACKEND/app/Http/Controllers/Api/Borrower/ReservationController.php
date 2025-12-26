@@ -26,7 +26,9 @@ class ReservationController extends Controller
             'user:id,name,email,role',
             'user.student:user_id,student_code,grade_level,class_name',
             'user.teacher:user_id,teacher_code,department,position',
-            'details.deviceUnit.device',
+            'details.deviceUnit' => function ($query) {
+                $query->withTrashed()->with('device');
+            },
             'approver:id,name'
         ]);
 
@@ -49,7 +51,6 @@ class ReservationController extends Controller
         $perPage = $request->get('per_page', 15);
         $reservations = $query->latest()->paginate($perPage);
 
-        // Không trả 404 nữa, luôn trả 200
         return response()->json([
             'message' => 'Success',
             'data' => $reservations
@@ -83,8 +84,10 @@ class ReservationController extends Controller
                 'user:id,name,email,role',
                 'user.student:user_id,student_code,grade_level,class_name',
                 'user.teacher:user_id,teacher_code,department,position',
-                'details.deviceUnit.device',
-                'approver:id,name'
+                'details.deviceUnit' => function ($query) {
+                    $query->withTrashed()->with('device');
+                },
+                'approver:id,name,email'
             ])->findOrFail($id);
 
             if (in_array(auth('api')->user()->role, ['student', 'teacher']) && $reservation->user_id !== auth('api')->id()) {

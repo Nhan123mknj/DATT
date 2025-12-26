@@ -30,6 +30,15 @@
           Lọc
         </button>
         <button
+          class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition flex items-center gap-2"
+          @click="exportToExcel"
+          :disabled="exportLoading"
+        >
+          <span v-if="!exportLoading">📊</span>
+          <span v-else class="animate-spin">⏳</span>
+          {{ exportLoading ? "Đang xuất..." : "Xuất Excel" }}
+        </button>
+        <button
           class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition flex items-center gap-2"
           @click="openCreateModal"
         >
@@ -65,7 +74,7 @@
             <div class="flex flex-wrap gap-2">
               <button
                 class="px-3 py-1 rounded-lg border border-gray-200 text-sm"
-                @click="openDetail(item)"
+                @click="handleOpenDetail(item)"
               >
                 Xem
               </button>
@@ -84,7 +93,7 @@
                 Hủy
               </button>
               <button
-                v-if="item.status === 'borrowed' || item.status === 'overdue'"
+                v-if="item.status === 'completed' || item.status === 'overdue'"
                 class="px-3 py-1 rounded-lg border border-blue-200 text-blue-600 text-sm"
                 @click="openReturnModal(item)"
               >
@@ -172,8 +181,6 @@ import BorrowReturnModal from "../../components/staff/borrows/BorrowReturnModal.
 import BorrowCreateModal from "../../components/staff/borrows/BorrowCreateModal.vue";
 import BorrowIssueOtpModal from "../../components/staff/borrows/BorrowIssueOtpModal.vue";
 import { staffBorrowService } from "../../services/staff/staffBorrowService";
-import { deviceService } from "../../services/shared/deviceService";
-import { staffUserService } from "../../services/staff/staffUserService";
 import { useBorrows } from "../../composables/fetchData/staff/useBorrows";
 import { useForm } from "../../composables/useForm";
 import { useQuickBorrow } from "../../composables/useQuickBorrow";
@@ -241,10 +248,10 @@ export default {
       showReturnModal,
       returnTarget,
       returnNotes,
+      returnOtp,
       returnError,
       returnLoading,
       returnItems,
-      signatures,
       openReturnModal,
       closeReturnModal,
       submitReturn,
@@ -274,6 +281,16 @@ export default {
       loadBorrows(page, filters);
     };
 
+    const handleOpenDetail = async (item) => {
+      try {
+        const response = await staffBorrowService.show(item.id);
+        openDetail(response.data);
+      } catch (error) {
+        toast.error("Không thể tải chi tiết phiếu mượn");
+        console.error(error);
+      }
+    };
+
     const approveBorrow = async (borrow) => {
       if (!confirm("Duyệt phiếu mượn này?")) return;
       try {
@@ -287,7 +304,6 @@ export default {
 
     const deviceUnitStore = useDeviceUnitStore();
 
-    // Issue Modal Logic
     const showIssueModal = ref(false);
     const issueTarget = ref({});
 
@@ -332,6 +348,7 @@ export default {
           } else {
             try {
               const response = await staffBorrowService.show(id);
+              console.log(response.data);
               if (response.data) {
                 openDetail(response.data);
               }
@@ -344,6 +361,34 @@ export default {
       { immediate: true }
     );
 
+    const exportLoading = ref(false);
+
+    const exportToExcel = async () => {
+      try {
+        exportLoading.value = true;
+        const response = await staffBorrowService.exportBorrows();
+
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute(
+          "download",
+          `phieu-muon-${new Date().toISOString().split("T")[0]}.xlsx`
+        );
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Đã xuất file Excel thành công");
+      } catch (error) {
+        console.error("Export error:", error);
+        toast.error("Không thể xuất file Excel");
+      } finally {
+        exportLoading.value = false;
+      }
+    };
+
     return {
       filters,
       headers,
@@ -351,6 +396,7 @@ export default {
       isLoading,
       pagination,
       handleLoadBorrows,
+      handleOpenDetail,
       statusClasses,
       formatDate,
       form,
@@ -396,6 +442,8 @@ export default {
       showIssueModal,
       issueTarget,
       closeIssueModal,
+      exportLoading,
+      exportToExcel,
     };
   },
 };

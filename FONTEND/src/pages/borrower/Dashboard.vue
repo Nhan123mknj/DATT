@@ -212,6 +212,36 @@
           </ul>
         </div>
       </section>
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th
+              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+            >
+              Mã phiếu mượn
+            </th>
+            <th
+              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+            >
+              Các thiêt bị đang mượn {{ borrowedItems.total_devices }}
+            </th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr v-for="borrow in borrowedItems.data" :key="borrow.id">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              {{ borrow.id }}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <ul>
+                <li v-for="device in borrow.details" :key="device.id">
+                  {{ device.device_unit.serial_number }}
+                </li>
+              </ul>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </template>
@@ -240,12 +270,28 @@ export default {
     const authStore = useAuthStore();
 
     const currentUser = computed(() => authStore.user);
-
+    const borrowedItems = ref([]);
     const stats = reactive({
       totalReservations: 0,
       pendingReservations: 0,
       activeBorrows: 0,
     });
+    // const getBorrowedMyList = async () => {
+    //   const response = await apiClient.get("/borrower/reports/borrows/me");
+    //   borrowedItems.value = response.data.data;
+    //   console.log(response.data.data);
+    // };
+    const getBorrowedMyList = async () => {
+      try {
+        const response = await apiClient.get(
+          "/borrower/dashboard/device-borrows"
+        );
+        borrowedItems.value = response.data;
+        console.log(borrowedItems.value);
+      } catch (error) {
+        console.error("Failed to load borrowed items:", error);
+      }
+    };
 
     const loadStatistics = async () => {
       try {
@@ -256,6 +302,7 @@ export default {
           stats.pendingReservations = data.reservations.pending || 0;
           stats.activeBorrows = data.borrows.active || 0;
         }
+        // console.log(response.data);
       } catch (error) {
         console.error("Failed to load statistics:", error);
       }
@@ -295,6 +342,7 @@ export default {
       loadStatistics();
       loadReservations();
       loadBorrows();
+      getBorrowedMyList();
     });
 
     return {
@@ -307,6 +355,7 @@ export default {
       formatDate,
       statusReverseLabel,
       statusClasses,
+      borrowedItems,
     };
   },
 };

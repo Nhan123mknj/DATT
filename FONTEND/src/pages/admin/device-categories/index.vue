@@ -65,7 +65,7 @@
           <template #actions="{ item }">
             <div class="flex gap-2">
               <button
-                class="px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm"
+                class="px-3 py-1 color-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm"
                 @click="openEdit(item)"
               >
                 Sửa

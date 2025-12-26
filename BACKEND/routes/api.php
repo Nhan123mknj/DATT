@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\Admin\MenuController;
 
 use App\Http\Controllers\Api\Admin\ReservationsController;
 use App\Http\Controllers\Api\Borrower\ReservationController;
+use App\Http\Controllers\Api\Borrower\ReturnSlipController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DeviceMaintenanceController;
 use App\Http\Controllers\Api\BorrowReturnController;
@@ -63,11 +64,28 @@ Route::prefix('admin')->middleware(['auth:api', 'role:admin'])->group(function (
     Route::post('device/import/excel', [DeviceController::class, 'import']);
     // Route::get('device/{id}/preview-delete', [DeviceController::class, 'previewDelete']);
     // Route::get('device/{id}/edit', [DeviceController::class, 'edit']);
-
-    Route::apiResource('device-units', DeviceUnitsController::class);
+    Route::get('device-units/export-borrowers', [DeviceUnitsController::class, 'exportBorrowers']);
+    Route::apiResource('device-units', DeviceUnitsController::class)->except(['destroy']);
+    Route::post('device-units/{id}/retire', [DeviceUnitsController::class, 'retire']);
+    Route::post('device-units/bulk-retire', [DeviceUnitsController::class, 'bulkRetire']);
+    Route::get('device-units/{id}/activity-log', [DeviceUnitsController::class, 'activityLog']);
+    Route::get('device-units/{id}/damage-history', [DeviceUnitsController::class, 'damageHistory']);
     Route::get('device-units/export/excel', [DeviceUnitsController::class, 'export']);
     Route::post('device-units/import/excel', [DeviceUnitsController::class, 'import']);
 
+
+    // Reports
+    Route::get('reports/dashboard-stats', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getDashboardStats']);
+    Route::get('reports/device-damage', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getDeviceDamageReports']);
+    Route::get('reports/device-damage/device/{deviceUnitId}', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getDeviceDamageHistory']);
+    Route::get('reports/device-damage/{id}', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getDeviceDamageDetail']);
+    Route::get('reports/user-activity/{userId}', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getUserActivityReport']);
+    Route::get('reports/borrow-statistics', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getBorrowStatistics']);
+    Route::get('reports/activity-logs', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getActivityLogs']);
+    Route::get('reports/stock', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getStockReport']);
+    Route::get('reports/borrows', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getDetailBorrowed']);
+    Route::get('reports/returns', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getDetailReturns']);
+    Route::get('reports/reservations', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getReserveList']);
 
     Route::get('menus', [MenuController::class, 'index']);
     Route::post('menus', [MenuController::class, 'store']);
@@ -97,17 +115,19 @@ Route::middleware(['auth:api'])->group(function () {
 Route::prefix('borrower')->middleware(['auth:api', 'role:student,teacher,admin'])->group(function () {
 
     Route::get('dashboard/statistics', [BorrowerDashboardController::class, 'statistics']);
-
+    Route::get('dashboard/device-borrows', [BorrowerDashboardController::class, 'getDeviceBorrows']);
     Route::apiResource('borrows', BorrowsController::class);
     Route::get('reservations', [ReservationController::class, 'index']);
     Route::post('reservations', [ReservationController::class, 'store']);
     Route::get('reservations/{id}', [ReservationController::class, 'show']);
     Route::put('reservations/{id}', [ReservationController::class, 'update']);
     Route::post('reservations/{id}/cancel', [ReservationController::class, 'cancel']);
-
+    Route::get('reports/borrows/me', [App\Http\Controllers\Api\Admin\ReportsController::class, 'getBorrowedByUser']);
     Route::get('device-categories', [SharedDeviceController::class, 'categories']);
     Route::get('device-categories/{id}/devices', [SharedDeviceController::class, 'devicesByCategory']);
     Route::get('devices/{id}/device-units', [SharedDeviceController::class, 'deviceUnitsByDevice']);
+    Route::get('return-slips', [ReturnSlipController::class, 'index']);
+    Route::get('return-slips/{id}', [ReturnSlipController::class, 'show']);
 });
 
 Route::prefix('staff')->middleware(['auth:api', 'role:staff,admin'])->group(function () {
@@ -116,10 +136,14 @@ Route::prefix('staff')->middleware(['auth:api', 'role:staff,admin'])->group(func
 
     Route::get('reservations', [StaffReservationController::class, 'index']);
     Route::get('reservations/statistics', [StaffReservationController::class, 'statistics']);
+    Route::get('reservations/export', [StaffReservationController::class, 'export']);
     Route::get('reservations/{id}', [StaffReservationController::class, 'show']);
     Route::post('reservations/{id}/approve', [StaffReservationController::class, 'approve']);
     Route::post('reservations/{id}/reject', [StaffReservationController::class, 'reject']);
     Route::post('reservations/{id}/create-borrow', [StaffReservationController::class, 'createBorrowManually']);
+
+
+    Route::get('borrows/export', [StaffBorrowsController::class, 'export']);
     Route::apiResource('borrows', StaffBorrowsController::class);
     Route::post('borrows/{id}/approve', [StaffBorrowsController::class, 'approve']);
     Route::post('borrows/{id}/reject', [StaffBorrowsController::class, 'reject']);
@@ -128,6 +152,12 @@ Route::prefix('staff')->middleware(['auth:api', 'role:staff,admin'])->group(func
     Route::post('borrows/{id}/send-otp', [StaffBorrowsController::class, 'sendOtp']);
     Route::post('borrows/{id}/send-return-otp', [StaffBorrowsController::class, 'sendReturnOtp']);
     Route::post('borrows/{id}/return', [StaffBorrowsController::class, 'processReturn']);
+
+    // Return Slips
+    Route::get('return-slips', [\App\Http\Controllers\Api\Staff\ReturnSlipController::class, 'index']);
+    Route::post('return-slips', [\App\Http\Controllers\Api\Staff\ReturnSlipController::class, 'store']);
+    Route::get('return-slips/{id}', [\App\Http\Controllers\Api\Staff\ReturnSlipController::class, 'show']);
+
     Route::get('users', [App\Http\Controllers\Api\Staff\UserController::class, 'index']);
 });
 

@@ -11,29 +11,60 @@
         :class="{ 'lg:grid-cols-2': borrow.reservation?.commitment_file }"
       >
         <div class="space-y-5">
-          <div
-            class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100"
-          >
-            <div>
-              <p
-                class="text-gray-500 text-xs uppercase tracking-wider font-semibold mb-1"
-              >
-                Mã phiếu
-              </p>
-              <p class="font-bold text-gray-900 text-lg">#{{ borrow.id }}</p>
+          <!-- Header with Created By Badge -->
+          <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+            <div class="grid grid-cols-2 gap-4 mb-3">
+              <div>
+                <p
+                  class="text-gray-500 text-xs uppercase tracking-wider font-semibold mb-1"
+                >
+                  Mã phiếu
+                </p>
+                <p class="font-bold text-gray-900 text-lg">#{{ borrow.id }}</p>
+                <p class="text-gray-500 text-xs mt-1">
+                  {{ formatDate(borrow.created_at) }}
+                </p>
+              </div>
+              <div class="text-right">
+                <p
+                  class="text-gray-500 text-xs uppercase tracking-wider font-semibold mb-1"
+                >
+                  Trạng thái
+                </p>
+                <span
+                  class="px-3 py-1 rounded-full text-xs font-semibold inline-block"
+                  :class="statusClasses(borrow.status)"
+                >
+                  {{ statusReverseLabel(borrow.status) }}
+                </span>
+              </div>
             </div>
-            <div class="text-right">
-              <p
-                class="text-gray-500 text-xs uppercase tracking-wider font-semibold mb-1"
-              >
-                Trạng thái
-              </p>
-              <span
-                class="px-3 py-1 rounded-full text-xs font-semibold inline-block"
-                :class="statusClasses(borrow.status)"
-              >
-                {{ statusReverseLabel(borrow.status) }}
-              </span>
+
+            <div
+              v-if="borrow.created_by_user_id && borrow.created_by"
+              class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg"
+            >
+              <div class="flex items-start gap-2">
+                <div
+                  class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0"
+                >
+                  <font-awesome-icon
+                    icon="user-tie"
+                    class="text-blue-600 text-sm"
+                  />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-xs font-semibold text-blue-800 mb-0.5">
+                    Phiếu được tạo hộ bởi nhân viên
+                  </p>
+                  <p class="text-sm font-medium text-blue-900">
+                    {{ borrow.created_by.name }}
+                  </p>
+                  <p class="text-xs text-blue-700 truncate">
+                    {{ borrow.created_by.email }}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -96,7 +127,7 @@
                     </div>
                   </div>
                   <button
-                    v-if="borrow.status === 'borrowed'"
+                    v-if="borrow.status === 'completed'"
                     @click="$emit('open-report', detail.device_unit)"
                     class="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 font-medium transition-colors"
                   >

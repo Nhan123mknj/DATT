@@ -84,6 +84,8 @@ class UserService
 
         return $code;
     }
+
+
     public function updateUser($id, array $data)
     {
         $user = User::find($id);
@@ -93,7 +95,8 @@ class UserService
         }
 
         if (isset($data['reset_password']) && $data['reset_password']) {
-            $data['password'] = bcrypt($user->name . "@123");
+            $cleanName = sanitizeNameForPassword($user->name);
+            $data['password'] = bcrypt($cleanName . "@123");
             unset($data['reset_password']);
         }
 
@@ -115,7 +118,8 @@ class UserService
         if (!$user) {
             return null;
         }
-        $newpassword = $user->name . '@123';
+        $cleanName = sanitizeNameForPassword($user->name);
+        $newpassword = $cleanName . '@123';
 
         $user->password = bcrypt($newpassword);
         $user->save();

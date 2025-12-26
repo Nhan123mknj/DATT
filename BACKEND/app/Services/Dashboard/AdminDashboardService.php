@@ -77,12 +77,12 @@ class AdminDashboardService
                 COUNT(CASE WHEN du.id IN (
                     SELECT device_unit_id FROM borrow_details bd
                     INNER JOIN borrows b ON bd.borrow_id = b.id
-                    WHERE b.status = 'borrowed'
+                    WHERE b.status = 'completed'
                 ) THEN 1 END) as units_borrowed,
                 COUNT(CASE WHEN du.id NOT IN (
                     SELECT device_unit_id FROM borrow_details bd
                     INNER JOIN borrows b ON bd.borrow_id = b.id
-                    WHERE b.status = 'borrowed'
+                    WHERE b.status = 'completed'
                 ) THEN 1 END) as units_available
             FROM devices d
             LEFT JOIN device_units du ON d.id = du.device_id
@@ -108,9 +108,9 @@ class AdminDashboardService
         $result = DB::selectOne("
             SELECT 
                 COUNT(*) as total_borrows,
-                COUNT(CASE WHEN status = 'borrowed' THEN 1 END) as active_borrows,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as active_borrows,
                 COUNT(CASE WHEN status = 'returned' THEN 1 END) as completed_borrows,
-                COUNT(CASE WHEN status = 'borrowed' AND expected_return_date < NOW() THEN 1 END) as overdue_borrows
+                COUNT(CASE WHEN status = 'completed' AND expected_return_date < NOW() THEN 1 END) as overdue_borrows
             FROM borrows
         ");
 
@@ -192,7 +192,7 @@ class AdminDashboardService
                 u.role,
                 COALESCE(s.student_code, t.teacher_code) as user_code,
                 COUNT(b.id) as total_borrows,
-                COUNT(CASE WHEN b.status = 'borrowed' THEN 1 END) as active_borrows
+                COUNT(CASE WHEN b.status = 'completed' THEN 1 END) as active_borrows
             FROM users u
             LEFT JOIN students s ON u.id = s.user_id
             LEFT JOIN teachers t ON u.id = t.user_id
@@ -226,14 +226,14 @@ class AdminDashboardService
         $result = DB::selectOne("
             SELECT 
                 COUNT(DISTINCT du.id) as total_units,
-                COUNT(DISTINCT CASE WHEN b.status = 'borrowed' THEN bd.device_unit_id END) as borrowed_units,
+                COUNT(DISTINCT CASE WHEN b.status = 'completed' THEN bd.device_unit_id END) as borrowed_units,
                 ROUND(
-                    (COUNT(DISTINCT CASE WHEN b.status = 'borrowed' THEN bd.device_unit_id END) / COUNT(DISTINCT du.id)) * 100,
+                    (COUNT(DISTINCT CASE WHEN b.status = 'completed' THEN bd.device_unit_id END) / COUNT(DISTINCT du.id)) * 100,
                     2
                 ) as utilization_rate
             FROM device_units du
             LEFT JOIN borrow_details bd ON du.id = bd.device_unit_id
-            LEFT JOIN borrows b ON bd.borrow_id = b.id AND b.status = 'borrowed'
+            LEFT JOIN borrows b ON bd.borrow_id = b.id AND b.status = 'completed'
         ");
 
         return [

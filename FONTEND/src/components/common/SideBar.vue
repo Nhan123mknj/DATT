@@ -192,9 +192,8 @@ const fetchMenu = async () => {
     };
 
     const tree = buildTree(rootItems);
-    console.log("🌲 Tree before transform:", tree);
     menuItems.value = transformItems(tree);
-    console.log("✅ Final menu items:", menuItems.value);
+
     expandActiveParents();
   } catch (e) {
     console.error("❌ Sidebar menu error:", e);

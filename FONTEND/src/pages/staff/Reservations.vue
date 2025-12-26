@@ -29,6 +29,15 @@
         >
           Lọc
         </button>
+        <button
+          class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition flex items-center gap-2"
+          @click="exportToExcel"
+          :disabled="exportLoading"
+        >
+          <span v-if="!exportLoading">📊</span>
+          <span v-else class="animate-spin">⏳</span>
+          {{ exportLoading ? "Đang xuất..." : "Xuất Excel" }}
+        </button>
       </div>
     </div>
 
@@ -124,7 +133,6 @@
       "
     />
 
-    <!-- Reject Modal -->
     <ReservationRejectModal
       :show="showRejectModal"
       :loading="rejectLoading"
@@ -133,7 +141,6 @@
       @submit="submitReject"
     />
 
-    <!-- Create Borrow Modal -->
     <ReservationCreateBorrowModal
       :show="showCreateBorrowModal"
       :reservation="selectedReservationForBorrow"
@@ -147,6 +154,7 @@
 <script>
 import { onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useToast } from "vue-toastification";
 import Table from "../../components/common/Table.vue";
 import LoadingSkeleton from "../../components/common/LoadingSkeleton.vue";
 import Pagination from "../../components/common/Pagination.vue";
@@ -171,6 +179,7 @@ export default {
   },
   setup() {
     const route = useRoute();
+    const toast = useToast();
     const { statusReverseLabel: statusLabel, statusClasses } = useStatusLabel();
     const { formatDate } = useFormatDate();
 
@@ -305,6 +314,35 @@ export default {
       { immediate: true }
     );
 
+    const exportLoading = ref(false);
+
+    const exportToExcel = async () => {
+      try {
+        exportLoading.value = true;
+        const response = await reservationsService.exportReservations(filters);
+
+        // Create download link
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute(
+          "download",
+          `phieu-dat-truoc-${new Date().toISOString().split("T")[0]}.xlsx`
+        );
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Đã xuất file Excel thành công");
+      } catch (error) {
+        console.error("Export error:", error);
+        toast.error("Không thể xuất file Excel");
+      } finally {
+        exportLoading.value = false;
+      }
+    };
+
     return {
       filters,
       headers,
@@ -334,6 +372,8 @@ export default {
       createBorrow: openCreateBorrowModal,
       closeCreateBorrowModal,
       submitCreateBorrow,
+      exportLoading,
+      exportToExcel,
     };
   },
 };

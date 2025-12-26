@@ -18,8 +18,8 @@
           :disabled="mode === 'edit'"
         >
           <option value="">-- Chọn thiết bị --</option>
-          <option v-for="unit in deviceUnits" :key="unit.id" :value="unit.id">
-            {{ unit.device?.name }} - SN: {{ unit.serial_number }}
+          <option v-for="unit in deviceUnits" :key="unit?.id" :value="unit?.id">
+            {{ unit?.device?.name }} - SN: {{ unit?.serial_number }}
           </option>
         </select>
         <p v-if="errors.device_unit_id" class="text-xs text-red-500 mt-1">
@@ -96,21 +96,6 @@
             <option value="in_progress">Đang xử lý</option>
             <option value="completed">Hoàn thành</option>
             <option value="cancelled">Đã hủy</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            Người xử lý
-          </label>
-          <select
-            v-model="form.assigned_to"
-            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500"
-          >
-            <option :value="null">-- Chưa phân công --</option>
-            <option v-for="user in staffUsers" :key="user.id" :value="user.id">
-              {{ user.name }}
-            </option>
           </select>
         </div>
       </div>
@@ -209,7 +194,7 @@
 import { ref, reactive, watch, onMounted } from "vue";
 import { useToast } from "vue-toastification";
 import maintenanceService from "../../services/maintenanceService";
-import { devicesService } from "../../services/devices/devicesService";
+import { deviceUnitService } from "../../services/admin/deviceUnitService";
 import { usersService } from "../../services/admin/usersService";
 import ModalForm from "../ModalForm.vue";
 
@@ -236,7 +221,6 @@ const form = reactive({
   priority: "normal",
   description: "",
   status: "pending",
-  assigned_to: null,
   start_date: "",
   end_date: "",
   cost: 0,
@@ -246,10 +230,13 @@ const form = reactive({
 
 const loadDeviceUnits = async () => {
   try {
-    const { data } = await devicesService.getDeviceUnits();
-    deviceUnits.value = data.data || [];
+    const { data } = await deviceUnitService.list({ status: "available" });
+
+    const units = data?.data?.data || [];
+    deviceUnits.value = units.filter((unit) => unit && unit.id);
   } catch (error) {
     console.error("Failed to load device units:", error);
+    deviceUnits.value = [];
   }
 };
 
@@ -301,7 +288,6 @@ watch(
           priority: "normal",
           description: "",
           status: "pending",
-          assigned_to: null,
           start_date: "",
           end_date: "",
           cost: 0,
@@ -315,7 +301,6 @@ watch(
           priority: props.maintenance.priority,
           description: props.maintenance.description,
           status: props.maintenance.status,
-          assigned_to: props.maintenance.assigned_to,
           start_date: props.maintenance.start_date
             ? props.maintenance.start_date.substring(0, 16)
             : "",

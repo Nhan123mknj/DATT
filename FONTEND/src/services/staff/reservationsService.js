@@ -24,5 +24,12 @@ export const reservationsService = {
     createBorrow(id) {
         return apiClient.post(`/staff/reservations/${id}/create-borrow`)
     },
+
+    exportReservations(filters = {}) {
+        return apiClient.get('/staff/reservations/export', {
+            params: filters,
+            responseType: 'blob',
+        })
+    },
     
 }

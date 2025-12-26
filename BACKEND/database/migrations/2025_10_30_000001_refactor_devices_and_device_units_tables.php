@@ -15,7 +15,7 @@ return new class extends Migration
             if (!Schema::hasColumn('devices', 'price')) {
                 $table->decimal('price', 10, 2)
                     ->default(0.00)
-                    ->after('name'); // đặt sau cột name cho dễ đọc
+                    ->after('name');
             }
         });
     }

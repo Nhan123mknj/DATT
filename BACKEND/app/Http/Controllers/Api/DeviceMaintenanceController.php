@@ -12,7 +12,7 @@ class DeviceMaintenanceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = DeviceMaintenance::with(['deviceUnit.device', 'reporter', 'assignee']);
+        $query = DeviceMaintenance::with(['deviceUnit.device', 'reporter']);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -25,9 +25,6 @@ class DeviceMaintenanceController extends Controller
             $query->where('device_unit_id', $request->device_unit_id);
         }
 
-        if ($request->has('assigned_to')) {
-            $query->where('assigned_to', $request->assigned_to);
-        }
 
         $maintenances = $query->orderBy('created_at', 'desc')->paginate(10);
 
@@ -68,7 +65,6 @@ class DeviceMaintenanceController extends Controller
 
         $validated = $request->validate([
             'status' => 'sometimes|in:pending,in_progress,completed,cancelled',
-            'assigned_to' => 'nullable|exists:users,id',
             'cost' => 'nullable|numeric',
             'notes' => 'nullable|string',
             'start_date' => 'nullable|date',

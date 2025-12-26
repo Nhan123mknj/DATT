@@ -16,9 +16,6 @@ class DeviceController extends Controller
     {
         $this->deviceService = $deviceService;
     }
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
         $filters = $request->only(['category_id', 'is_active', 'search']);
@@ -34,9 +31,6 @@ class DeviceController extends Controller
         ], 200);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -58,9 +52,7 @@ class DeviceController extends Controller
         }
     }
 
-    /**
-     * Display the specified resource.
-     */
+
     public function show(string $id)
     {
         try {
@@ -71,9 +63,7 @@ class DeviceController extends Controller
         }
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
+
 
     public function update(Request $request, string $id)
     {
@@ -98,9 +88,6 @@ class DeviceController extends Controller
         }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
         try {
@@ -126,9 +113,6 @@ class DeviceController extends Controller
         }
     }
 
-    /**
-     * Import devices from Excel
-     */
     public function import(Request $request)
     {
         $validator = Validator::make($request->all(), [

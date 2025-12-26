@@ -40,4 +40,11 @@ export const staffBorrowService = {
   return(id, data) {
     return apiClient.post(`/staff/borrows/${id}/return`, data)
   },
+
+  exportBorrows(filters = {}) {
+    return apiClient.get('/staff/borrows/export', {
+      params: filters,
+      responseType: 'blob',
+    })
+  },
 }

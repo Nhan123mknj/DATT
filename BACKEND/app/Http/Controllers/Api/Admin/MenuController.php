@@ -15,7 +15,7 @@ class MenuController extends Controller
     {
         $items = MenuItem::whereNull('parent_id')
             ->with('childrenRecursive')
-            ->orderBy('sort_order')
+            ->orderBy('id', 'asc')
             ->get();
 
         return response()->json([

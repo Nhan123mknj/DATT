@@ -36,7 +36,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
         'created_at',
         'updated_at',
         'avatar',
-        'credit_score',
+        'credit_score', 
     ];
     protected $appends = ['avatar_url'];
 

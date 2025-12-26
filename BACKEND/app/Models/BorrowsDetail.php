@@ -28,4 +28,8 @@ class BorrowsDetail extends Model
     {
         return $this->belongsTo(DeviceUnits::class, 'device_unit_id');
     }
+    public function returnSlipDetail()
+    {
+        return $this->hasOne(ReturnSlipDetail::class, 'borrow_detail_id');
+    }
 }

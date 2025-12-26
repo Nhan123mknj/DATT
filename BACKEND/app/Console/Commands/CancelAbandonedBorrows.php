@@ -18,14 +18,14 @@ class CancelAbandonedBorrows extends Command
         $days = $this->option('days');
         $cutoffDate = now()->subDays($days);
 
-        $this->info("Checking for approved borrows created before {$cutoffDate}...");
+        $this->info("Tìm phiếu mượn đã được duyệt trong {$days} ngày (before {$cutoffDate})...");
 
         $abandonedBorrows = Borrows::where('status', 'approved')
             ->where('created_at', '<', $cutoffDate)
             ->get();
 
         if ($abandonedBorrows->isEmpty()) {
-            $this->info('No abandoned borrows found.');
+            $this->info('Không tìm thấy phiếu mượn đã được duyệt trong {$days} ngày.');
             return;
         }
 
@@ -33,7 +33,7 @@ class CancelAbandonedBorrows extends Command
         foreach ($abandonedBorrows as $borrow) {
             try {
                 $borrowService->cancelBorrow($borrow->id);
-                $this->info("Cancelled borrow #{$borrow->id}");
+                $this->info("Hủy phiếu mượn #{$borrow->id}");
                 Log::info("Auto-cancelled abandoned borrow #{$borrow->id}");
                 $count++;
             } catch (\Exception $e) {
@@ -42,6 +42,6 @@ class CancelAbandonedBorrows extends Command
             }
         }
 
-        $this->info("Completed. Cancelled {$count} abandoned borrows.");
+        $this->info("Hoàn thành! Hủy {$count} phiếu mượn.");
     }
 }

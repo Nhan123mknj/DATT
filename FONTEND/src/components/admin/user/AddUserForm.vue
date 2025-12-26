@@ -125,9 +125,9 @@
 </template>
 
 <script>
-import { usersService } from "../../services/admin/usersService";
+import ModalForm from "../../ModalForm.vue";
+import { usersService } from "../../../services/admin/usersService";
 import { useToast } from "vue-toastification";
-import ModalForm from "../ModalForm.vue";
 
 export default {
   name: "AddUserForm",

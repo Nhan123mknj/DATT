@@ -19,7 +19,28 @@ export const deviceUnitService = {
     return apiClient.put(`${BASE_URL}/${id}`, payload)
   },
 
-  remove(id) {
-    return apiClient.delete(`${BASE_URL}/${id}`)
+  retire(id, data = {}) {
+    return apiClient.post(`${BASE_URL}/${id}/retire`, data)
+  },
+
+  // bulkRetire(deviceUnitIds, params={}) {
+  //   return apiClient.post(`${BASE_URL}/bulk-retire`, {
+  //     device_unit_ids: deviceUnitIds,
+  //     retire_reason: retireReason
+  //   })
+  // },
+
+  exportExcel() {
+    return apiClient.get(`${BASE_URL}/export/excel`, {
+      responseType: 'blob'
+    })
+  },
+
+  importExcel(formData) {
+    return apiClient.post(`${BASE_URL}/import/excel`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
   },
 }

@@ -5,12 +5,14 @@
         <button
           v-html="link.label"
           @click="goTo(link.url)"
-          :disabled="!link.url"
-          class="min-w-[38px] h-[38px] px-3 flex items-center justify-center text-sm font-medium border rounded-lg transition-all duration-150 border-gray-300 text-gray-700 bg-white hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-          :class="{
-            'bg-indigo-600 text-white border-indigo-600 focus:bg-indigo-700 hover:text-white':
-              link.active,
-          }"
+          :disabled="!link.url || link.active"
+          :class="[
+            'min-w-[38px] h-[38px] px-3 flex items-center justify-center text-sm font-medium border rounded-lg transition-all duration-200',
+            link.active
+              ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700 cursor-default shadow-sm'
+              : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400',
+            !link.url ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+          ]"
         ></button>
       </li>
     </ul>

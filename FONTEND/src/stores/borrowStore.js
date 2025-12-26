@@ -25,7 +25,7 @@ export const useBorrowStore = defineStore("borrow", () => {
       };
 
       const response = await borrowService.list(params);
-      const payload = response.data.borrowSlip;
+      const payload = response.data.borrowSlip || response.data;
 
       borrows.value = payload?.data || [];
       pagination.current_page = payload?.current_page || 1;
@@ -47,13 +47,12 @@ export const useBorrowStore = defineStore("borrow", () => {
   };
 
   const fetchBorrowById = async (id) => {
-    // 1. Check if exists in current list
     const existing = borrows.value.find((b) => b.id == id);
     if (existing) return existing;
 
-    // 2. If not, fetch from API
     try {
       const response = await borrowService.show(id);
+      // console.log(response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch borrow details:", error);

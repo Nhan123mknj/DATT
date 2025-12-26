@@ -11,7 +11,6 @@
         :class="{ 'lg:grid-cols-2': reservation.commitment_file }"
       >
         <div class="space-y-5">
-          <!-- Header Info -->
           <div
             class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100"
           >

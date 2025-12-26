@@ -52,15 +52,7 @@ class BorrowsController extends Controller
      */
     public function show(string $id)
     {
-        $result = Borrows::with([
-            'details:id,borrow_id,device_unit_id',
-            'details.deviceUnit:id,device_id,serial_number',
-            'details.deviceUnit.device:id,name',
-            'reservation:id,commitment_file'
-        ])->findOrFail($id);
-
-        $this->authorize($result, 'view');
-
+        $result = $this->borrowService->getDetailBorrowingSlip($id);
         return response()->json($result, 200);
     }
 

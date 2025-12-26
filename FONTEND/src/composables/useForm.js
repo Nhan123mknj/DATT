@@ -44,6 +44,7 @@ export function useForm(options = {}) {
     };
 
     const openDetail = (item) => {
+        // console.log(item);
         modalMode.value = 'detail';
         resetForm();
 

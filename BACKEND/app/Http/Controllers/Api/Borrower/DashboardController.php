@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Borrower;
 
 use App\Http\Controllers\Controller;
+use App\Models\Borrows;
 use App\Services\Dashboard\BorrowerDashboardService;
+use Illuminate\Support\Facades\Request;
 
 class DashboardController extends Controller
 {
@@ -36,5 +38,22 @@ class DashboardController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+    public function getDeviceBorrows(Request $request)
+    {
+        $userId = auth()->id();
+        $result = Borrows::with('details.deviceUnit')
+            ->whereNotNull('issued_at')
+            ->whereDoesntHave('returnSlip')
+            ->where('borrower_id', $userId)
+            ->get();
+        $totalDevices = $result->sum(function ($borrow) {
+            return $borrow->details->count();
+        });
+        return response()->json([
+            // 'count' => $result->count(),
+            'total_devices' => $totalDevices,
+            'data' => $result
+        ], 200);
     }
 }

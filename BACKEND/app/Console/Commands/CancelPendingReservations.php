@@ -16,7 +16,7 @@ class CancelPendingReservations extends Command
         $hours = $this->option('hours');
         $cutoffTime = now()->subHours($hours);
 
-        $this->info("Checking reservations older than {$hours} hours (before {$cutoffTime})...");
+        $this->info("Tìm phiếu đặt nào chưa được duyệt trong {$hours} giờ (before {$cutoffTime})...");
 
         $oldReservations = DeviceReservation::where('status', 'pending')
             ->where('created_at', '<', $cutoffTime)
@@ -24,11 +24,11 @@ class CancelPendingReservations extends Command
             ->get();
 
         if ($oldReservations->isEmpty()) {
-            $this->info('No old pending reservations found.');
+            $this->info('Không tìm thấy phiếu đặt nào chưa được duyệt trong {$hours} giờ.');
             return 0;
         }
 
-        $this->info("Found {$oldReservations->count()} reservations to cancel.");
+        $this->info("{$oldReservations->count()} phiếu đặt chưa được duyệt trong {$hours} giờ.");
         $canceledCount = 0;
 
         DB::transaction(function () use ($oldReservations, &$canceledCount) {
@@ -51,15 +51,15 @@ class CancelPendingReservations extends Command
                         broadcast(new \App\Events\ReservationRequestCancel($reservation));
                     }
 
-                    $this->line("✓ Canceled #{$reservation->id} - {$reservation->user->name}");
+                    $this->line("✓ Hủy phiếu #{$reservation->id} - {$reservation->user->name}");
                     $canceledCount++;
                 } catch (\Exception $e) {
-                    $this->error("✗ Failed #{$reservation->id}: {$e->getMessage()}");
+                    $this->error("✗ Hủy phiếu #{$reservation->id}: {$e->getMessage()}");
                 }
             }
         });
 
-        $this->info("\n✅ Completed! Canceled {$canceledCount} reservations.");
+        $this->info("\n✅ Hoàn thành! Hủy {$canceledCount} phiếu.");
         return 0;
     }
 }

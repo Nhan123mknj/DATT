@@ -242,6 +242,27 @@
             </div>
 
             <div
+              v-if="selectedReservation.approved_by"
+              class="bg-green-50 border border-green-100 rounded-xl p-4"
+            >
+              <p class="font-bold text-green-800 mb-2 flex items-center gap-2">
+                <font-awesome-icon icon="user-check" />
+                Thông tin duyệt
+              </p>
+              <div class="grid grid-cols-1 gap-2">
+                <div>
+                  <p class="text-gray-500 text-xs mb-1">Người duyệt</p>
+                  <p class="font-medium text-gray-900">
+                    {{ selectedReservation.approver?.name || "N/A" }}
+                  </p>
+                  <p class="text-xs text-gray-500">
+                    {{ selectedReservation.approver?.email || "" }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div
               v-if="selectedReservation.notes"
               class="bg-amber-50 border border-amber-100 rounded-xl p-4"
             >

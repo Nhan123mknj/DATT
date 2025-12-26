@@ -44,9 +44,45 @@ const admin = [
         meta: { title: 'Thiết bị đơn vị' },
       },
       {
+        path: 'reports',
+        name: 'admin.reports',
+        component: () => import('../pages/admin/reports/Dashboard.vue'),
+        meta: { title: 'Thống kê & Báo cáo' },
+      },
+      {
+        path: 'reports/device-damage',
+        name: 'admin.reports.deviceDamage',
+        component: () => import('../pages/admin/reports/DeviceDamageReports.vue'),
+        meta: { title: 'Báo cáo hư hỏng thiết bị' },
+      },
+      {
+        path: 'reports/device-damage/:deviceUnitId',
+        name: 'admin.reports.deviceDamageHistory',
+        component: () => import('../pages/admin/device-units/DamageHistory.vue'),
+        meta: { title: 'Lịch sử hư hỏng thiết bị' },
+      },
+      {
+        path: 'reports/borrow-statistics',
+        name: 'admin.reports.borrowStatistics',
+        component: () => import('../pages/admin/reports/BorrowStatistics.vue'),
+        meta: { title: 'Thống kê mượn trả' },
+      },
+      {
+        path: 'reports/activity-logs',
+        name: 'admin.reports.activityLogs',
+        component: () => import('../pages/admin/reports/ActivityLogs.vue'),
+        meta: { title: 'Lịch sử hoạt động' },
+      },
+      {
+        path: 'reports/stock',
+        name: 'admin.reports.stock',
+        component: () => import('../pages/admin/reports/StockReport.vue'),
+        meta: { title: 'Báo cáo kho' },
+      },
+      {
         path: 'borrows',
         name: 'admin.borrows',
-        component: () => import('../pages/borrower/Borrows.vue'),
+        component: () => import('../pages/admin/borrows/Borrows.vue'),
         meta: { title: 'Phiếu mượn' },
       },
       {
@@ -64,7 +100,7 @@ const admin = [
       {
         path: 'maintenances',
         name: 'admin.maintenances',
-        component: () => import('../pages/admin/Maintenances.vue'),
+        component: () => import('../pages/admin/maintenances/Maintenances.vue'),
         meta: { title: 'Quản lý Bảo trì' },
       },
     ],

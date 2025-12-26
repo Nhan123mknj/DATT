@@ -24,7 +24,7 @@ export function useBorrows() {
       };
 
       const response = await borrowService.list(params);
-      const payload = response.data.borrowSlip;
+      const payload = response.data.borrowSlip || response.data;
 
       borrows.value = payload?.data || [];
       pagination.current_page = payload?.current_page || 1;

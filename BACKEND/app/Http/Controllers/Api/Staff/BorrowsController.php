@@ -33,10 +33,8 @@ class BorrowsController extends Controller
     }
     public function show(string $id)
     {
-        $result = $this->borrowService->getBorrowingSlipById($id);
-        return response()->json([
-            'borrowSlip' => $result
-        ]);
+        $result = $this->borrowService->getDetailBorrowingSlip($id);
+        return response()->json($result, 200);
     }
 
     public function create()
@@ -100,14 +98,14 @@ class BorrowsController extends Controller
             'borrowSlip' => $borrow
         ], 201);
     }
-    public function approveBorrowRequest(string $id)
-    {
-        $result = $this->borrowService->approveBorrowRequest($id);
-        return response()->json([
-            'message' => 'Phiếu mượn đã được duyệt thành công',
-            'borrowSlip' => $result
-        ]);
-    }
+    // public function approveBorrowRequest(string $id)
+    // {
+    //     $result = $this->borrowService->approveBorrowRequest($id);
+    //     return response()->json([
+    //         'message' => 'Phiếu mượn đã được duyệt thành công',
+    //         'borrowSlip' => $result
+    //     ]);
+    // }
     public function rejectBorrowRequest(string $id)
     {
         $result = $this->borrowService->rejectBorrowRequest($id);
@@ -117,14 +115,14 @@ class BorrowsController extends Controller
         ]);
     }
 
-    public function approve(string $id)
-    {
-        $result = $this->borrowService->approveBorrowRequest($id);
-        return response()->json([
-            'message' => 'Phiếu mượn đã được duyệt thành công',
-            'borrowSlip' => $result
-        ]);
-    }
+    // public function approve(string $id)
+    // {
+    //     $result = $this->borrowService->approveBorrowRequest($id);
+    //     return response()->json([
+    //         'message' => 'Phiếu mượn đã được duyệt thành công',
+    //         'borrowSlip' => $result
+    //     ]);
+    // }
 
     public function reject(Request $request, string $id)
     {
@@ -166,45 +164,63 @@ class BorrowsController extends Controller
 
     public function sendReturnOtp(string $id)
     {
-        $result = $this->borrowService->sendReturnOtp($id);
+        $returnSlipService = app(\App\Services\ReturnSlipService::class);
+        $result = $returnSlipService->sendReturnOtp($id);
         return response()->json($result);
     }
 
     public function processReturn(Request $request, string $id)
     {
         $request->validate([
-            'return_items' => 'required|array|min:1',
-            'return_items.*.device_unit_id' => 'required|integer|exists:device_units,id',
-            'return_items.*.condition_at_return' => 'required|in:excellent,good,fair,damaged,broken',
-            'return_items.*.photos' => 'nullable|array|max:5',
-            'return_items.*.photos.*' => 'image|max:5120',
+            'devices' => 'required|array|min:1',
+            'devices.*.borrow_detail_id' => 'required|exists:borrow_details,id',
+            'devices.*.device_unit_id' => 'required|exists:device_units,id',
+            'devices.*.condition_status' => 'required|in:good,minor_damage,major_damage,broken',
+            'devices.*.condition_notes' => 'nullable|string',
+            'devices.*.damage_description' => 'nullable|string',
+            'devices.*.damage_fee' => 'nullable|numeric|min:0',
+            'overall_condition' => 'nullable|in:good,minor_damage,major_damage,broken',
+            'condition_notes' => 'nullable|string',
             'otp' => 'required|string|size:6',
-            'notes' => 'nullable|string|max:1000',
         ]);
 
-        $returnItems = collect($request->return_items)->map(function ($item, $index) use ($request) {
-            if ($request->hasFile("return_items.{$index}.photos")) {
-                $photos = [];
-                foreach ($request->file("return_items.{$index}.photos") as $photo) {
-                    $path = $photo->store('return_photos', 'public');
-                    $photos[] = $path;
-                }
-                $item['photos'] = $photos;
-            }
-            return $item;
-        })->toArray();
 
-        // Process return
-        $result = $this->borrowService->createReturnSlip(
-            $id,
-            $returnItems,
-            $request->otp,
-            $request->notes
-        );
+        $returnSlipService = app(\App\Services\ReturnSlipService::class);
+
+
+        $verifyResult = $returnSlipService->verifyReturnOtp($id, $request->otp);
+        if (!$verifyResult['success']) {
+            return response()->json([
+                'message' => $verifyResult['message']
+            ], 400);
+        }
+
+        $returnSlip = $returnSlipService->createReturnSlip([
+            'borrow_id' => $id,
+            'overall_condition' => $request->overall_condition ?? 'good',
+            'condition_notes' => $request->condition_notes,
+            'devices' => $request->devices,
+        ]);
 
         return response()->json([
             'message' => 'Đã xử lý trả thiết bị thành công',
-            'borrowSlip' => $result
+            'return_slip' => $returnSlip,
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        try {
+            $filters = $request->only(['status']);
+
+            return \Maatwebsite\Excel\Facades\Excel::download(
+                new \App\Exports\BorrowsExport($filters),
+                'phieu-muon-' . now()->format('Y-m-d') . '.xlsx'
+            );
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Không thể xuất file Excel: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

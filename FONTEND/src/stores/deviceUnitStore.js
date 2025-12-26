@@ -38,12 +38,11 @@ export const useDeviceUnitStore = defineStore("deviceUnit", () => {
         status: filters.status || undefined,
       };
 
+
       const { data } = await deviceUnitService.list(params);
       const payload = data.data;
-    //   console.log(payload);
       
-      units.value = payload;
-      // console.log(units);
+      units.value = payload.data || [];
       
       pagination.current_page = payload?.current_page || 1;
       pagination.per_page = payload?.per_page || 10;
@@ -84,7 +83,6 @@ export const useDeviceUnitStore = defineStore("deviceUnit", () => {
     try {
       await deviceUnitService.update(id, unitData);
       toast.success("Cập nhật đơn vị thiết bị thành công");
-      // Update local state
       const index = units.value.findIndex(u => u.id === id);
       if (index !== -1) {
           units.value[index] = { ...units.value[index], ...unitData };
@@ -96,27 +94,58 @@ export const useDeviceUnitStore = defineStore("deviceUnit", () => {
     }
   };
 
-  const deleteUnit = async (unitId) => {
-    if (!confirm("Bạn chắc chắn muốn xóa đơn vị thiết bị này?")) return false;
-
-    // Find unit to get device_id before deleting
+  const retireUnit = async (unitId, retireReason) => {
     const unit = units.value.find(u => u.id === unitId);
     const deviceId = unit?.device_id;
 
     try {
-      await deviceUnitService.remove(unitId);
-      toast.success("Đã xóa đơn vị thiết bị");
-      // Remove from local state immediately
-      units.value = units.value.filter((u) => u.id !== unitId);
-      pagination.total--;
+      await deviceUnitService.retire(unitId, retireReason);
+      toast.success("Đã thanh lý thiết bị");
+      
+      const index = units.value.findIndex(u => u.id === unitId);
+      if (index !== -1) {
+        units.value[index].status = 'retired';
+        units.value[index].retired_at = new Date().toISOString();
+        units.value[index].retire_reason = retireReason;
+      }
 
       if (deviceId) {
-          deviceStore.updateDeviceUnitCount(deviceId, -1);
+        deviceStore.updateDeviceUnitCount(deviceId, -1);
       }
       return true;
     } catch (error) {
       toast.error(
-        error.response?.data?.message || "Không thể xóa đơn vị thiết bị"
+        error.response?.data?.error || "Không thể thanh lý thiết bị"
+      );
+      return false;
+    }
+  };
+
+  const bulkRetireUnits = async (unitIds, retireReason) => {
+    try {
+      const { data } = await deviceUnitService.bulkRetire(unitIds, retireReason);
+      
+      toast.success(data.message || `Đã thanh lý ${data.retired?.length || 0} thiết bị`);
+      
+      data.retired?.forEach(retiredUnit => {
+        const index = units.value.findIndex(u => u.id === retiredUnit.id);
+        if (index !== -1) {
+          units.value[index].status = 'retired';
+          units.value[index].retired_at = retiredUnit.retired_at;
+          units.value[index].retire_reason = retiredUnit.retire_reason;
+        }
+      });
+
+      if (data.errors?.length > 0) {
+        data.errors.forEach(err => {
+          toast.warning(`ID ${err.id}: ${err.error}`);
+        });
+      }
+
+      return true;
+    } catch (error) {
+      toast.error(
+        error.response?.data?.error || "Không thể thanh lý hàng loạt"
       );
       return false;
     }
@@ -145,7 +174,8 @@ export const useDeviceUnitStore = defineStore("deviceUnit", () => {
     fetchUnits,
     addUnit,
     updateUnit,
-    deleteUnit,
+    retireUnit,
+    bulkRetireUnits,
     updateUnitState,
     initializeListener,
     updateUnitStatus: (unitId, status) => {

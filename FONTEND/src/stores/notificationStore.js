@@ -2,7 +2,6 @@ import { ref, computed } from 'vue';
 import notificationService from '../services/notificationService';
 import { useToast } from 'vue-toastification';
 
-// Shared state (singleton pattern)
 const notifications = ref([]);
 const toast = useToast();
 let pollingInterval = null;
@@ -13,9 +12,7 @@ export function useNotifications() {
         notifications.value.filter(n => !n.read).length
     );
 
-    /**
-     * Fetch notifications from API
-     */
+
     async function fetchNotifications() {
         try {
             const data = await notificationService.getNotifications();
@@ -36,15 +33,11 @@ export function useNotifications() {
             }
             
             notifications.value = newNotifications;
-            console.log('[Notifications] Fetched:', newNotifications.length);
         } catch (error) {
             console.error('[Notifications] Fetch failed:', error);
         }
     }
 
-    /**
-     * Get toast type based on notification type
-     */
     function getToastType(type) {
         const typeMap = {
             'App\\Notifications\\BorrowNotification': 'info',
@@ -56,16 +49,11 @@ export function useNotifications() {
         return typeMap[type] || 'info';
     }
 
-    /**
-     * Start polling for notifications
-     */
     function startPolling() {
         if (isPolling) {
-            console.log('[Notifications] Already polling, skipping');
             return;
         }
 
-        console.log('[Notifications] Starting polling');
         isPolling = true;
         
         fetchNotifications();
@@ -73,11 +61,7 @@ export function useNotifications() {
         pollingInterval = setInterval(fetchNotifications, 30000);
     }
 
-    /**
-     * Stop polling
-     */
     function stopPolling() {
-        console.log('[Notifications] Stopping polling');
         isPolling = false;
         
         if (pollingInterval) {
@@ -86,9 +70,7 @@ export function useNotifications() {
         }
     }
 
-    /**
-     * Mark notification as read
-     */
+
     async function markAsRead(id) {
         try {
             await notificationService.markAsRead(id);
@@ -101,9 +83,6 @@ export function useNotifications() {
         }
     }
 
-    /**
-     * Mark all notifications as read
-     */
     async function markAllAsRead() {
         try {
             await notificationService.markAllAsRead();
@@ -113,9 +92,7 @@ export function useNotifications() {
         }
     }
 
-    /**
-     * Clear all notifications
-     */
+
     function clear() {
         notifications.value = [];
     }
@@ -132,5 +109,4 @@ export function useNotifications() {
     };
 }
 
-// Alias export for backward compatibility
 export const useNotificationStore = useNotifications;

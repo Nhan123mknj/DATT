@@ -129,7 +129,7 @@ export default {
       loading.value = true;
       error.value = "";
       try {
-        const res = await staffBorrowService.issueOtp(props.borrow.id);
+        const res = await staffBorrowService.sendOtp(props.borrow.id);
         email.value = res.data.email;
         step.value = 2;
         toast.success("Đã gửi mã OTP thành công");
