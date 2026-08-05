@@ -3,7 +3,9 @@
     <ul class="inline-flex items-center space-x-2">
       <li v-for="(link, index) in links" :key="index">
         <button
-          v-html="link.label"
+          {{
+          link.label
+          }}
           @click="goTo(link.url)"
           :disabled="!link.url || link.active"
           :class="[

@@ -19,13 +19,14 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
-
+    'allowed_origins' => [
+        env('FRONTEND_URL', 'http://localhost:5173'),
+        // Thêm URL frontend production
+    ],
+    'allowed_methods' => ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    'allowed_headers' => ['Content-Type', 'Authorization', 'X-Requested-With'],
+    'exposed_headers' => [],
     'allowed_origins_patterns' => [],
-
-    'allowed_headers' => ['*'],
-
-    'exposed_headers' => ['*'],
 
     'max_age' => 0,
 

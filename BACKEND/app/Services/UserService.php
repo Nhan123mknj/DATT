@@ -118,7 +118,7 @@ class UserService
         if (!$user) {
             return null;
         }
-        $cleanName = sanitizeNameForPassword($user->name);
+        $cleanName = sanitizeNameForPassword($user->email);
         $newpassword = $cleanName . '@123';
 
         $user->password = bcrypt($newpassword);
