@@ -1,6 +1,6 @@
 FROM php:8.3-fpm-alpine
 
-# Cài đặt các thư viện hệ thống (đã bổ sung libpng, libjpeg, freetype cho extension GD)
+# Cài đặt các thư viện hệ thống
 RUN apk add --no-cache \
     nginx \
     supervisor \
@@ -15,7 +15,7 @@ RUN apk add --no-cache \
     oniguruma-dev \
     libzip-dev
 
-# Cài đặt PHP extension (đã thêm gd)
+# Cài đặt PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_mysql mbstring zip bcmath gd xml
 
@@ -27,12 +27,16 @@ WORKDIR /var/www/html
 # Copy toàn bộ code backend vào container
 COPY . .
 
-# Chạy composer install kết hợp ignore platform reqs để vượt qua mọi kiểm tra môi trường
+# Chạy composer install
 RUN composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
 # Cấp quyền ghi file cho storage và cache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
+# Copy file cấu hình supervisor
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
 EXPOSE 80
 
-CMD php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=80
+# Chạy migration và bật Supervisor để chạy cả Web + Queue cùng lúc
+CMD php artisan migrate --force && supervisord -c /etc/supervisor/conf.d/supervisord.conf
