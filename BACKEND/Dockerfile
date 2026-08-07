@@ -1,7 +1,8 @@
 FROM php:8.3-fpm-alpine
 
-# Cài đặt các thư viện hệ thống
+# Cài đặt các thư viện hệ thống và PHPIZE_DEPS (cần thiết để build PECL extensions)
 RUN apk add --no-cache \
+    $PHPIZE_DEPS \
     nginx \
     supervisor \
     libpng-dev \
@@ -15,9 +16,14 @@ RUN apk add --no-cache \
     oniguruma-dev \
     libzip-dev
 
-# Cài đặt PHP extensions
+# Cài đặt PHP extensions (bao gồm cả extension redis)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip bcmath gd xml
+    && docker-php-ext-install pdo pdo_mysql mbstring zip bcmath gd xml \
+    && pecl install redis \
+    && docker-php-ext-enable redis
+
+# Dọn dẹp các công cụ build (giữ image nhẹ) sau khi cài xong pecl
+RUN apk del $PHPIZE_DEPS
 
 # Copy Composer từ image chính thức
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
